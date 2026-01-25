@@ -50,7 +50,7 @@ struct CommandEditor: View {
 
         // Initialize custom provider configuration
         _customProviderBaseURL = State(initialValue: command.wrappedValue.customProviderBaseURL ?? "")
-        _customProviderApiKey = State(initialValue: command.wrappedValue.customProviderApiKey ?? "")
+        _customProviderApiKey = State(initialValue: KeychainManager.shared.retrieveCustomProviderApiKey(for: command.wrappedValue.id) ?? "")
         _customProviderModel = State(initialValue: command.wrappedValue.customProviderModel ?? "")
     }
 
@@ -318,24 +318,24 @@ struct CommandEditor: View {
                 let trimmedModel = customProviderModel.trimmingCharacters(in: .whitespacesAndNewlines)
 
                 updatedCommand.customProviderBaseURL = trimmedBaseURL.isEmpty ? nil : trimmedBaseURL
-                updatedCommand.customProviderApiKey = trimmedApiKey.isEmpty ? nil : trimmedApiKey
                 updatedCommand.customProviderModel = trimmedModel.isEmpty ? nil : trimmedModel
                 updatedCommand.modelOverride = nil
 
                 logger.debug("CommandEditor: Saving custom provider - baseURL=\(trimmedBaseURL), apiKey=\(trimmedApiKey.isEmpty ? "empty" : "set"), model=\(trimmedModel)")
+                KeychainManager.shared.saveCustomProviderApiKey(trimmedApiKey, for: updatedCommand.id)
             } else {
                 // Save model override for standard providers
                 updatedCommand.modelOverride = customModel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : customModel.trimmingCharacters(in: .whitespacesAndNewlines)
                 updatedCommand.customProviderBaseURL = nil
-                updatedCommand.customProviderApiKey = nil
                 updatedCommand.customProviderModel = nil
+                KeychainManager.shared.deleteCustomProviderApiKey(for: updatedCommand.id)
             }
         } else {
             updatedCommand.providerOverride = nil
             updatedCommand.modelOverride = nil
             updatedCommand.customProviderBaseURL = nil
-            updatedCommand.customProviderApiKey = nil
             updatedCommand.customProviderModel = nil
+            KeychainManager.shared.deleteCustomProviderApiKey(for: updatedCommand.id)
         }
 
         command = updatedCommand

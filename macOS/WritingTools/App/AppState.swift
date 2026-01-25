@@ -63,8 +63,9 @@ final class AppState {
         // Handle custom provider
         if providerName == "custom" {
             logger.debug("AppState.getProvider: Custom provider selected")
+            let apiKey = KeychainManager.shared.retrieveCustomProviderApiKey(for: command.id)
             if let baseURL = command.customProviderBaseURL,
-               let apiKey = command.customProviderApiKey,
+               let apiKey,
                let model = command.customProviderModel {
                 logger.debug("AppState.getProvider: Creating CustomProvider with baseURL=\(baseURL), model=\(model)")
                 let config = CustomProviderConfig(
@@ -74,7 +75,7 @@ final class AppState {
                 )
                 return CustomProvider(config: config)
             } else {
-                logger.warning("AppState.getProvider: Custom provider config incomplete - baseURL=\(command.customProviderBaseURL ?? "nil"), apiKey=\(command.customProviderApiKey != nil ? "set" : "nil"), model=\(command.customProviderModel ?? "nil")")
+                logger.warning("AppState.getProvider: Custom provider config incomplete - baseURL=\(command.customProviderBaseURL ?? "nil"), apiKey=\(apiKey != nil ? "set" : "nil"), model=\(command.customProviderModel ?? "nil")")
             }
             // Fallback to active provider if custom config is incomplete
             return activeProvider
@@ -322,7 +323,7 @@ final class AppState {
 
     // Process a command (unified method for all command types)
     func processCommand(_ command: CommandModel) {
-        guard !selectedText.isEmpty else { return }
+        guard !selectedText.isEmpty, !isProcessing else { return }
 
         isProcessing = true
 

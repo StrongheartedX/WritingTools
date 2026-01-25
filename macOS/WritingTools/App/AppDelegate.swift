@@ -102,6 +102,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     private func executeCommandDirectly(_ command: CommandModel) {
+        guard !appState.isProcessing else {
+            logger.debug("Command ignored because a request is already in progress.")
+            return
+        }
         appState.activeProvider.cancel()
 
         Task { @MainActor in

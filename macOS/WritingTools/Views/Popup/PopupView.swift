@@ -194,7 +194,7 @@ struct PopupView: View {
   private func processCommandAndCloseWhenDone(
     _ command: CommandModel
   ) async {
-    guard !appState.selectedText.isEmpty else {
+    guard !appState.selectedText.isEmpty, !appState.isProcessing else {
       processingCommandId = nil
       return
     }
@@ -254,13 +254,13 @@ struct PopupView: View {
   }
 
   private func processCustomChange() {
-    guard !customText.isEmpty else { return }
+    guard !customText.isEmpty, !appState.isProcessing else { return }
     isCustomLoading = true
     processCustomInstruction(customText)
   }
 
   private func processCustomInstruction(_ instruction: String) {
-    guard !instruction.isEmpty else { return }
+    guard !instruction.isEmpty, !appState.isProcessing else { return }
     appState.isProcessing = true
 
     // Capture setting value once at the start
@@ -416,4 +416,3 @@ struct PopupView: View {
   )
   .frame(width: 400, height: 500)
 }
-

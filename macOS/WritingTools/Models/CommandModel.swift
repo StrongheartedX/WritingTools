@@ -23,7 +23,6 @@ struct CommandModel: Codable, Identifiable, Equatable {
 
     /// Custom provider configuration (only used when providerOverride == "custom")
     var customProviderBaseURL: String?
-    var customProviderApiKey: String?
     var customProviderModel: String?
 
     // MARK: – CodingKeys
@@ -37,8 +36,11 @@ struct CommandModel: Codable, Identifiable, Equatable {
         case providerOverride
         case modelOverride
         case customProviderBaseURL
-        case customProviderApiKey
         case customProviderModel
+    }
+
+    private enum LegacyCodingKeys: String, CodingKey {
+        case customProviderApiKey
     }
 
     // MARK: – Decoding (old data OK)
@@ -57,8 +59,13 @@ struct CommandModel: Codable, Identifiable, Equatable {
         providerOverride = try c.decodeIfPresent(String.self, forKey: .providerOverride)
         modelOverride = try c.decodeIfPresent(String.self, forKey: .modelOverride)
         customProviderBaseURL = try c.decodeIfPresent(String.self, forKey: .customProviderBaseURL)
-        customProviderApiKey = try c.decodeIfPresent(String.self, forKey: .customProviderApiKey)
         customProviderModel = try c.decodeIfPresent(String.self, forKey: .customProviderModel)
+
+        let legacyContainer = try decoder.container(keyedBy: LegacyCodingKeys.self)
+        if let legacyKey = try legacyContainer.decodeIfPresent(String.self, forKey: .customProviderApiKey),
+           !legacyKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            KeychainManager.shared.saveCustomProviderApiKey(legacyKey, for: id)
+        }
     }
 
     // MARK: – Encoding (store compactly)
@@ -84,9 +91,6 @@ struct CommandModel: Codable, Identifiable, Equatable {
         if let customProviderBaseURL = customProviderBaseURL {
             try c.encode(customProviderBaseURL, forKey: .customProviderBaseURL)
         }
-        if let customProviderApiKey = customProviderApiKey {
-            try c.encode(customProviderApiKey, forKey: .customProviderApiKey)
-        }
         if let customProviderModel = customProviderModel {
             try c.encode(customProviderModel, forKey: .customProviderModel)
         }
@@ -105,7 +109,6 @@ struct CommandModel: Codable, Identifiable, Equatable {
          providerOverride: String? = nil,
          modelOverride: String? = nil,
          customProviderBaseURL: String? = nil,
-         customProviderApiKey: String? = nil,
          customProviderModel: String? = nil) {
         self.id = id
         self.name = name
@@ -118,7 +121,6 @@ struct CommandModel: Codable, Identifiable, Equatable {
         self.providerOverride = providerOverride
         self.modelOverride = modelOverride
         self.customProviderBaseURL = customProviderBaseURL
-        self.customProviderApiKey = customProviderApiKey
         self.customProviderModel = customProviderModel
     }
 

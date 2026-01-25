@@ -10,6 +10,8 @@ import Security
 
 final class KeychainManager: @unchecked Sendable {
     static let shared = KeychainManager()
+    private let serviceName = "com.aryamirsepasi.writing-tools"
+    private let customProviderKeyPrefix = "custom_provider_api_key_"
 
     private init() {}
     
@@ -48,7 +50,7 @@ final class KeychainManager: @unchecked Sendable {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrAccount as String: key,
-            kSecAttrService as String: "com.aryamirsepasi.writing-tools",
+            kSecAttrService as String: serviceName,
             kSecValueData as String: data,
             kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlocked
         ]
@@ -68,7 +70,7 @@ final class KeychainManager: @unchecked Sendable {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrAccount as String: key,
-            kSecAttrService as String: "com.aryamirsepasi.writing-tools",
+            kSecAttrService as String: serviceName,
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne
         ]
@@ -97,7 +99,7 @@ final class KeychainManager: @unchecked Sendable {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrAccount as String: key,
-            kSecAttrService as String: "com.aryamirsepasi.writing-tools"
+            kSecAttrService as String: serviceName
         ]
         
         let status = SecItemDelete(query as CFDictionary)
@@ -145,5 +147,98 @@ final class KeychainManager: @unchecked Sendable {
             results[key] = hasMigratedKey(forKey: key)
         }
         return results
+    }
+
+    // MARK: - Synchronizable Keychain (iCloud Keychain)
+
+    func saveSynchronizable(_ value: String, forKey key: String) throws {
+        guard !value.isEmpty else {
+            try deleteSynchronizable(forKey: key)
+            return
+        }
+
+        guard let data = value.data(using: .utf8) else {
+            throw KeychainError.failedToSave(-1)
+        }
+
+        try deleteSynchronizable(forKey: key)
+
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: key,
+            kSecAttrService as String: serviceName,
+            kSecValueData as String: data,
+            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlocked,
+            kSecAttrSynchronizable as String: kCFBooleanTrue as Any
+        ]
+
+        let status = SecItemAdd(query as CFDictionary, nil)
+        guard status == errSecSuccess else {
+            throw KeychainError.failedToSave(status)
+        }
+    }
+
+    func retrieveSynchronizable(forKey key: String) throws -> String? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: key,
+            kSecAttrService as String: serviceName,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+            kSecAttrSynchronizable as String: kSecAttrSynchronizableAny
+        ]
+
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+
+        if status == errSecItemNotFound {
+            return nil
+        }
+
+        guard status == errSecSuccess else {
+            throw KeychainError.failedToRead(status)
+        }
+
+        guard let data = result as? Data else {
+            throw KeychainError.noDataFound
+        }
+
+        return String(data: data, encoding: .utf8)
+    }
+
+    func deleteSynchronizable(forKey key: String) throws {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: key,
+            kSecAttrService as String: serviceName,
+            kSecAttrSynchronizable as String: kSecAttrSynchronizableAny
+        ]
+
+        let status = SecItemDelete(query as CFDictionary)
+        guard status == errSecSuccess || status == errSecItemNotFound else {
+            throw KeychainError.failedToDelete(status)
+        }
+    }
+
+    // MARK: - Custom Provider API Keys (Synchronizable)
+
+    func saveCustomProviderApiKey(_ value: String?, for commandId: UUID) {
+        let key = customProviderKeyPrefix + commandId.uuidString
+        let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if trimmed.isEmpty {
+            try? deleteSynchronizable(forKey: key)
+        } else {
+            try? saveSynchronizable(trimmed, forKey: key)
+        }
+    }
+
+    func retrieveCustomProviderApiKey(for commandId: UUID) -> String? {
+        let key = customProviderKeyPrefix + commandId.uuidString
+        return try? retrieveSynchronizable(forKey: key)
+    }
+
+    func deleteCustomProviderApiKey(for commandId: UUID) {
+        let key = customProviderKeyPrefix + commandId.uuidString
+        try? deleteSynchronizable(forKey: key)
     }
 }

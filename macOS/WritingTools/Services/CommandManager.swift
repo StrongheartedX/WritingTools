@@ -38,13 +38,15 @@ final class CommandManager {
     
     func deleteCommand(_ command: CommandModel) {
         commands.removeAll { $0.id == command.id }
-        
+
         // If it's a built-in command, track its ID as deleted
         if command.isBuiltIn {
             deletedDefaultIds.insert(command.id)
             saveDeletedDefaultIds()
         }
-        
+
+        KeychainManager.shared.deleteCustomProviderApiKey(for: command.id)
+
         saveCommands()
         notifyCommandsChanged()
     }
@@ -57,6 +59,10 @@ final class CommandManager {
     
     // Public method to replace all commands
     func replaceAllCommands(with newCommands: [CommandModel]) {
+        let removedIds = Set(commands.map(\.id)).subtracting(newCommands.map(\.id))
+        for id in removedIds {
+            KeychainManager.shared.deleteCustomProviderApiKey(for: id)
+        }
         commands = newCommands
         saveCommands()
         notifyCommandsChanged()
@@ -88,6 +94,10 @@ final class CommandManager {
         if let data = UserDefaults.standard.data(forKey: saveKey),
            let decoded = try? JSONDecoder().decode([CommandModel].self, from: data) {
             self.commands = decoded
+            if containsLegacyCustomProviderKey(in: data) {
+                saveCommands()
+                notifyCommandsChanged()
+            }
         } else {
             // Fallback if something went wrong with loading
             initializeDefaultCommands()
@@ -111,6 +121,13 @@ final class CommandManager {
         if let encoded = try? JSONEncoder().encode(deletedDefaultIds) {
             UserDefaults.standard.set(encoded, forKey: deletedDefaultsKey)
         }
+    }
+
+    private func containsLegacyCustomProviderKey(in data: Data) -> Bool {
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
+            return false
+        }
+        return json.contains { $0["customProviderApiKey"] != nil }
     }
     
     // MARK: - Default Commands

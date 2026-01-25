@@ -1,7 +1,7 @@
 import Foundation
 import Observation
 
-struct OllamaConfig: Codable {
+struct OllamaConfig: Codable, Sendable {
     var baseURL: String         // Accepts either "http://host:11434" or ".../api"
     var model: String
     var keepAlive: String?      // e.g. "5m", "0", "-1"
@@ -52,64 +52,72 @@ final class OllamaProvider: AIProvider {
         isProcessing = true
         defer { isProcessing = false }
 
-        // 1) Build combined prompt: system message + user input
-        var combinedPrompt = ""
-        
-        // Include system prompt if provided
-        if let system = systemPrompt, !system.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            combinedPrompt = system + "\n\n"
-        }
-        
-        // Add user's actual text
-        combinedPrompt += userPrompt
-        
-        var imagesForOllama: [String] = []
+        let config = self.config
+        let systemPrompt = systemPrompt
+        let userPrompt = userPrompt
+        let images = images
+        let streaming = streaming
+        let imageMode = AppSettings.shared.ollamaImageMode
 
-        if !images.isEmpty {
-            let imageMode = await MainActor.run { AppSettings.shared.ollamaImageMode }
-            switch imageMode {
-            case .ocr:
-                let ocrText = await OCRManager.shared.extractText(from: images)
-                if !ocrText.isEmpty {
-                    combinedPrompt += "\n\nExtracted Text: \(ocrText)"
-                }
-            case .ollama:
-                imagesForOllama = images.map { $0.base64EncodedString() }
+        return try await Task.detached(priority: .userInitiated) {
+            // 1) Build combined prompt: system message + user input
+            var combinedPrompt = ""
+
+            // Include system prompt if provided
+            if let system = systemPrompt, !system.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                combinedPrompt = system + "\n\n"
             }
-        }
 
-        // 2) Construct URL
-        guard let url = makeEndpointURL("/generate") else {
-            throw makeClientError("Invalid base URL '\(config.baseURL)'. Expected like http://localhost:11434 or http://localhost:11434/api")
-        }
+            // Add user's actual text
+            combinedPrompt += userPrompt
 
-        // 3) Build request body - everything in one "prompt" field
-        var body: [String: Any] = [
-            "model": config.model,
-            "prompt": combinedPrompt,  // ← CRITICAL: Combined system+user here
-            "stream": streaming
-        ]
-        if let keepAlive = config.keepAlive, !keepAlive.isEmpty {
-            body["keep_alive"] = keepAlive
-        }
-        if !imagesForOllama.isEmpty {
-            body["images"] = imagesForOllama
-        }
+            var imagesForOllama: [String] = []
 
-        let jsonData = try JSONSerialization.data(withJSONObject: body)
+            if !images.isEmpty {
+                switch imageMode {
+                case .ocr:
+                    let ocrText = await OCRManager.shared.extractText(from: images)
+                    if !ocrText.isEmpty {
+                        combinedPrompt += "\n\nExtracted Text: \(ocrText)"
+                    }
+                case .ollama:
+                    imagesForOllama = images.map { $0.base64EncodedString() }
+                }
+            }
 
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.httpBody = jsonData
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
+            // 2) Construct URL
+            guard let url = Self.makeEndpointURL(config.baseURL, path: "/generate") else {
+                throw Self.makeClientError("Invalid base URL '\(config.baseURL)'. Expected like http://localhost:11434 or http://localhost:11434/api")
+            }
 
-        // 4) Execute request
-        if streaming {
-            return try await performStreaming(request)
-        } else {
-            return try await performOneShot(request)
-        }
+            // 3) Build request body - everything in one "prompt" field
+            var body: [String: Any] = [
+                "model": config.model,
+                "prompt": combinedPrompt,
+                "stream": streaming
+            ]
+            if let keepAlive = config.keepAlive, !keepAlive.isEmpty {
+                body["keep_alive"] = keepAlive
+            }
+            if !imagesForOllama.isEmpty {
+                body["images"] = imagesForOllama
+            }
+
+            let jsonData = try JSONSerialization.data(withJSONObject: body)
+
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.httpBody = jsonData
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue("application/json", forHTTPHeaderField: "Accept")
+
+            // 4) Execute request
+            if streaming {
+                return try await Self.performStreaming(request)
+            } else {
+                return try await Self.performOneShot(request)
+            }
+        }.value
     }
 
     func cancel() {
@@ -118,7 +126,7 @@ final class OllamaProvider: AIProvider {
 
     // MARK: - Networking
 
-    private func performOneShot(_ request: URLRequest) async throws -> String {
+    nonisolated private static func performOneShot(_ request: URLRequest) async throws -> String {
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse else {
             throw makeClientError("Invalid response from server.")
@@ -139,7 +147,7 @@ final class OllamaProvider: AIProvider {
         return text
     }
 
-    private func performStreaming(_ request: URLRequest) async throws -> String {
+    nonisolated private static func performStreaming(_ request: URLRequest) async throws -> String {
         var aggregate = ""
         let (stream, response) = try await URLSession.shared.bytes(for: request)
         guard let http = response as? HTTPURLResponse else {
@@ -170,8 +178,8 @@ final class OllamaProvider: AIProvider {
 
     // MARK: - Utilities
 
-    private func makeEndpointURL(_ path: String) -> URL? {
-        let trimmed = config.baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+    nonisolated private static func makeEndpointURL(_ baseURL: String, path: String) -> URL? {
+        let trimmed = baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
         let noSlash = trimmed.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         let root: String = noSlash.hasSuffix("api")
             ? String(noSlash.dropLast(3)).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
@@ -180,7 +188,7 @@ final class OllamaProvider: AIProvider {
         return URL(string: full)
     }
 
-    private func decodeServerError(from data: Data) -> String {
+    nonisolated private static func decodeServerError(from data: Data) -> String {
         if let obj = try? JSONDecoder().decode(GenerateChunk.self, from: data),
            let err = obj.error, !err.isEmpty {
             return err
@@ -188,11 +196,11 @@ final class OllamaProvider: AIProvider {
         return String(data: data, encoding: .utf8) ?? "Unknown server error."
     }
 
-    private func makeClientError(_ message: String) -> NSError {
+    nonisolated private static func makeClientError(_ message: String) -> NSError {
         NSError(domain: "OllamaClient", code: -1, userInfo: [NSLocalizedDescriptionKey: message])
     }
 
-    private func makeServerError(_ code: Int, _ message: String) -> NSError {
+    nonisolated private static func makeServerError(_ code: Int, _ message: String) -> NSError {
         let hint: String
         if message.localizedCaseInsensitiveContains("image") && !message.localizedCaseInsensitiveContains("tool") {
             hint = "\nHint: The selected model may not support images. Try OCR mode or a vision model like 'llava'."
