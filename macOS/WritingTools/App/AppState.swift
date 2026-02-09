@@ -37,6 +37,8 @@ final class AppState {
     // Key: "providerName:model" -> Provider instance
     @ObservationIgnored
     private var modelOverrideProviderCache: [String: any AIProvider] = [:]
+    @ObservationIgnored
+    private var cacheInsertionOrder: [String] = []
     private let maxCacheSize = 10
 
     var customInstruction: String = ""
@@ -194,21 +196,22 @@ final class AppState {
             return activeProvider
         }
 
-        // Evict oldest entries if cache is full (simple FIFO)
+        // Evict oldest entry if cache is full (FIFO by insertion order)
         if modelOverrideProviderCache.count >= maxCacheSize {
-            if let firstKey = modelOverrideProviderCache.keys.first {
-                modelOverrideProviderCache.removeValue(forKey: firstKey)
-            }
+            let oldest = cacheInsertionOrder.removeFirst()
+            modelOverrideProviderCache.removeValue(forKey: oldest)
         }
 
         // Cache the new provider
         modelOverrideProviderCache[cacheKey] = provider
+        cacheInsertionOrder.append(cacheKey)
         return provider
     }
 
     /// Clear the model override provider cache (call when settings change)
     func clearProviderCache() {
         modelOverrideProviderCache.removeAll()
+        cacheInsertionOrder.removeAll()
     }
 
     private init() {
@@ -484,6 +487,8 @@ final class AppState {
         isProcessing = true
 
         Task {
+            defer { isProcessing = false }
+
             do {
                 let prompt = command.prompt
                 let input = try await resolveCommandInput()
@@ -529,8 +534,6 @@ final class AppState {
             } catch {
                 logger.error("Error processing command: \(error.localizedDescription)")
             }
-
-            isProcessing = false
         }
     }
 
@@ -545,8 +548,9 @@ final class AppState {
         pasteboard.prepareForNewContents(with: [])
         pasteboard.writeObjects([newText as NSString])
 
-        // Reactivate previous application
+        // Reactivate previous application using cooperative activation
         if let previousApp = previousApplication {
+            NSApp.yieldActivation(toApplicationWithBundleIdentifier: previousApp.bundleIdentifier ?? "")
             let didActivate = previousApp.activate(options: [.activateAllWindows])
             if !didActivate {
                 logger.warning("Failed to activate previous app: \(previousApp.bundleIdentifier ?? "unknown")")
@@ -650,6 +654,7 @@ final class AppState {
         pb.writeObjects([item])
 
         if let previous = previousApplication {
+            NSApp.yieldActivation(toApplicationWithBundleIdentifier: previous.bundleIdentifier ?? "")
             let didActivate = previous.activate(options: [.activateAllWindows])
             if !didActivate {
                 logger.warning("Failed to activate previous app: \(previous.bundleIdentifier ?? "unknown")")
@@ -693,7 +698,13 @@ final class AppState {
             "Writing Tools couldn't restore your clipboard after pasting into \(bundleId). You may need to re-copy your previous clipboard contents."
         alert.alertStyle = .warning
         alert.addButton(withTitle: "OK")
-        alert.runModal()
+
+        NSApp.activate()
+        if let keyWindow = NSApp.keyWindow {
+            alert.beginSheetModal(for: keyWindow)
+        } else {
+            alert.runModal()
+        }
     }
 }
 

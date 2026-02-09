@@ -16,40 +16,15 @@ struct CommandButton: View {
                     onTap()
                 }
             }) {
-                HStack {
-                    // Leave space for the delete button if in edit mode
-                    if isEditing {
-                        Color.clear
-                            .frame(width: 10, height: 16)
-                    }
-                    
-                    HStack(spacing: 4) {
-                        Image(systemName: command.icon)
-                        Text(command.name)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
-                    }
-                    
-                    // Leave space for the edit button if in edit mode
-                    if isEditing {
-                        Color.clear
-                            .frame(width: 10, height: 16)
-                    }
+                HStack(spacing: 4) {
+                    Image(systemName: command.icon)
+                    Text(command.name)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
                 }
-                .frame(maxWidth: 140)
+                .frame(maxWidth: .infinity)
                 .padding()
                 .contentShape(Rectangle())
-                .background {
-                    if #available(macOS 26, *) {
-                        // Use Liquid Glass effect on macOS 26+
-                        Color.clear
-                            .glassEffect(.regular, in: .rect(cornerRadius: 8))
-                    } else {
-                        // Fallback for older macOS versions
-                        Color(.controlBackgroundColor)
-                            .clipShape(.rect(cornerRadius: 8))
-                    }
-                }
             }
             .buttonStyle(LoadingButtonStyle(isLoading: isLoading))
             .disabled(isLoading || isEditing)
@@ -61,7 +36,7 @@ struct CommandButton: View {
             if isEditing {
                 HStack {
                     Button(action: onDelete) {
-                        Image(systemName: "minus.circle")
+                        Image(systemName: "minus.circle.fill")
                             .foregroundStyle(.red)
                             .padding(8)
                             .contentShape(Rectangle())
@@ -73,7 +48,7 @@ struct CommandButton: View {
                     Spacer()
                     
                     Button(action: onEdit) {
-                        Image(systemName: "pencil.circle")
+                        Image(systemName: "pencil.circle.fill")
                             .foregroundStyle(.blue)
                             .padding(8)
                             .contentShape(Rectangle())
@@ -82,10 +57,38 @@ struct CommandButton: View {
                     .accessibilityLabel("Edit \(command.name)")
                     .accessibilityHint("Edit this command's details")
                 }
-                .frame(maxWidth: 140)
-                .padding(.horizontal, 8)
+                .padding(.horizontal, 4)
             }
         }
+        .commandButtonBackground()
+    }
+}
+
+// MARK: - Command Button Background
+
+/// Applies the correct background style based on OS version:
+/// Liquid Glass on macOS 26+, solid color on older versions.
+/// The glass effect is applied directly as a view modifier (not inside
+/// .background {}) so the system correctly renders the Liquid Glass
+/// material behind the view's content without double-blurring.
+private struct CommandButtonBackgroundModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(macOS 26, *) {
+            content
+                .glassEffect(.regular, in: .rect(cornerRadius: 8))
+        } else {
+            content
+                .background(
+                    Color(.controlBackgroundColor)
+                        .clipShape(.rect(cornerRadius: 8))
+                )
+        }
+    }
+}
+
+extension View {
+    func commandButtonBackground() -> some View {
+        modifier(CommandButtonBackgroundModifier())
     }
 }
 

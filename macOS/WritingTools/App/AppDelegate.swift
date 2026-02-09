@@ -8,8 +8,6 @@ private let logger = AppLogger.logger("AppDelegate")
 /// Menu bar UI is handled by SwiftUI's MenuBarExtra in writing_toolsApp.swift.
 @MainActor
 class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
-    // Property to track service-triggered popups
-    private var isServiceTriggered: Bool = false
     private var iCloudSyncObserver: NSObjectProtocol?
     
     let appState = AppState.shared
@@ -165,7 +163,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                         provider: provider
                     )
 
-                    NSApp.activate(ignoringOtherApps: true)
+                    NSApp.activate()
                     WindowManager.shared.addResponseWindow(window)
                     window.makeKeyAndOrderFront(nil)
                     window.orderFrontRegardless()
@@ -180,18 +178,23 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         } catch {
             logger.error("Error processing command \(command.name): \(error.localizedDescription)")
 
-            // Show non-blocking error alert
-            await MainActor.run {
-                let alert = NSAlert()
-                alert.messageText = "Command Error"
-                alert.informativeText = "Failed to process '\(command.name)': \(error.localizedDescription)"
-                alert.alertStyle = .warning
-                alert.addButton(withTitle: "OK")
-                
-                NSApp.activate(ignoringOtherApps: true)
-                alert.beginSheetModal(for: NSApp.keyWindow ?? alert.window) { _ in }
+            let alert = NSAlert()
+            alert.messageText = "Command Error"
+            alert.informativeText = "Failed to process '\(command.name)': \(error.localizedDescription)"
+            alert.alertStyle = .warning
+            alert.addButton(withTitle: "OK")
+
+            NSApp.activate()
+            if let keyWindow = NSApp.keyWindow {
+                await alert.beginSheetModal(for: keyWindow)
+            } else {
+                alert.runModal()
             }
         }
+    }
+
+    func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
+        true
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -221,9 +224,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         alert.alertStyle = .informational
         alert.addButton(withTitle: "OK")
         
-        // Use non-blocking alert
         NSApp.activate()
-        alert.beginSheetModal(for: NSApp.keyWindow ?? alert.window) { _ in }
+        if let keyWindow = NSApp.keyWindow {
+            alert.beginSheetModal(for: keyWindow)
+        } else {
+            alert.runModal()
+        }
     }
 
     private func showOnboarding() {
@@ -262,7 +268,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             }
 
             window.positionNearMouse()
-            NSApp.activate(ignoringOtherApps: true)
+            NSApp.activate()
             window.makeKeyAndOrderFront(nil)
             window.orderFrontRegardless()
         }
@@ -277,10 +283,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         logger.info("iCloud command sync \(enabled ? "enabled" : "disabled")")
     }
 
-    func windowWillClose(_ notification: Notification) {
-        guard !isServiceTriggered else { return }
-        // Window cleanup is handled by WindowManager for popup and response windows
-    }
 }
 
 extension AppDelegate {

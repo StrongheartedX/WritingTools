@@ -168,7 +168,7 @@ import ApplicationServices
   }
 
   private func openCommandsManager() {
-    WindowManager.shared.transitonFromOnboardingToSettings(appState: appState)
+    WindowManager.shared.transitionFromOnboardingToSettings(appState: appState)
   }
 
   @MainActor

@@ -2,7 +2,7 @@ import Foundation
 import Vision
 import AppKit
 
-class OCRManager {
+final class OCRManager: Sendable {
     static let shared = OCRManager()
     
     private init() {}

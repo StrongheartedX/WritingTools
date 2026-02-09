@@ -2,11 +2,7 @@ import SwiftUI
 
 struct LoadingBorderModifier: ViewModifier {
     let isLoading: Bool
-    @State private var rotation: Double = 0
-    @Environment(\.colorScheme) var colorScheme
     @Environment(\.accessibilityReduceMotion) var reduceMotion
-    
-    private let accentColor = Color.blue
     
     func body(content: Content) -> some View {
         content

@@ -186,11 +186,11 @@ final class CommandManager {
         // 3. Newly converted custom commands from the legacy system
         self.commands = defaultCmds + existingCustom + convertedCustom
         
-        // Remove any duplicates (by name)
-        let uniqueCommands = Dictionary(grouping: self.commands, by: { $0.name })
-            .compactMap { $1.first }
-        
-        self.commands = uniqueCommands
+        // Remove duplicates (by name) while preserving insertion order
+        var seenNames = Set<String>()
+        self.commands = self.commands.filter { command in
+            seenNames.insert(command.name).inserted
+        }
         saveCommands()
         notifyCommandsChanged()
     }

@@ -4,7 +4,8 @@ import UniformTypeIdentifiers
 
 private let logger = AppLogger.logger("ClipboardCoordinator")
 
-actor ClipboardCoordinator {
+@MainActor
+final class ClipboardCoordinator {
     static let shared = ClipboardCoordinator()
 
     struct CaptureResult {
@@ -115,7 +116,7 @@ actor ClipboardCoordinator {
         return foundImages
     }
 
-    private static func loadImageData(from urls: [URL]) async -> [Data] {
+    nonisolated private static func loadImageData(from urls: [URL]) async -> [Data] {
         await Task.detached(priority: .userInitiated) {
             var images: [Data] = []
             images.reserveCapacity(urls.count)
@@ -131,7 +132,7 @@ actor ClipboardCoordinator {
         }.value
     }
 
-    private static func isValidImageData(_ data: Data) -> Bool {
+    nonisolated private static func isValidImageData(_ data: Data) -> Bool {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil) else {
             return false
         }

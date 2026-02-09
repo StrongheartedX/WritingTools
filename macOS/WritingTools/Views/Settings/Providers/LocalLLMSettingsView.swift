@@ -190,6 +190,16 @@ struct LocalLLMSettingsView: View {
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 8)
             }
+
+            Button {
+                llmProvider.revealModelsFolder()
+            } label: {
+                Label("Show Models in Finder", systemImage: "folder")
+                    .font(.caption)
+            }
+            .buttonStyle(.borderless)
+            .foregroundStyle(.secondary)
+            .help("Open the folder where local models are stored.")
         }
     }
     
@@ -234,19 +244,10 @@ struct LocalLLMSettingsView: View {
                     Button("Delete Model") {
                         showingDeleteAlert = true
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.borderedProminent)
                     .tint(.red)
                     .help("Remove the downloaded model from disk.")
                     .disabled(llmProvider.isDownloading || llmProvider.running)
-                }
-
-                if case .loading = llmProvider.loadState {
-                    HStack(spacing: 8) {
-                        ProgressView().controlSize(.small)
-                        Text("Loading model into memory...")
-                            .foregroundStyle(.secondary)
-                    }
-                    .accessibilityLabel("Loading model into memory")
                 }
             }
 

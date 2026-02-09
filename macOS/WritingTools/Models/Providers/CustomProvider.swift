@@ -39,6 +39,94 @@ final class CustomProvider: AIProvider {
         return try await task.value
     }
 
+    func processTextStreaming(
+        systemPrompt: String?,
+        userPrompt: String,
+        images: [Data],
+        onChunk: @escaping @MainActor (String) -> Void
+    ) async throws {
+        isProcessing = true
+        defer {
+            isProcessing = false
+        }
+
+        let config = self.config
+
+        guard !config.baseURL.isEmpty else {
+            throw CustomProviderError.invalidConfiguration("Base URL is required")
+        }
+        guard !config.apiKey.isEmpty else {
+            throw CustomProviderError.invalidConfiguration("API Key is required")
+        }
+        guard !config.model.isEmpty else {
+            throw CustomProviderError.invalidConfiguration("Model is required")
+        }
+
+        guard var urlComponents = URLComponents(string: config.baseURL) else {
+            throw CustomProviderError.invalidConfiguration("Invalid Base URL format")
+        }
+        if !urlComponents.path.hasSuffix("/chat/completions") {
+            if urlComponents.path.isEmpty || urlComponents.path == "/" {
+                urlComponents.path = "/v1/chat/completions"
+            } else if !urlComponents.path.contains("/chat/completions") {
+                urlComponents.path += "/chat/completions"
+            }
+        }
+        guard let url = urlComponents.url else {
+            throw CustomProviderError.invalidConfiguration("Could not construct valid URL")
+        }
+
+        var messages: [[String: Any]] = []
+        if let systemPrompt = systemPrompt, !systemPrompt.isEmpty {
+            messages.append(["role": "system", "content": systemPrompt])
+        }
+        messages.append(["role": "user", "content": userPrompt])
+
+        let requestBody: [String: Any] = [
+            "model": config.model,
+            "messages": messages,
+            "temperature": 0.7,
+            "max_tokens": 4096,
+            "stream": true
+        ]
+
+        var requestBuilder = URLRequest(url: url)
+        requestBuilder.httpMethod = "POST"
+        requestBuilder.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        requestBuilder.setValue("Bearer \(config.apiKey)", forHTTPHeaderField: "Authorization")
+        requestBuilder.timeoutInterval = 60
+        requestBuilder.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
+        let request = requestBuilder
+
+        let (stream, response) = try await URLSession.shared.bytes(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw CustomProviderError.networkError("Invalid response from server")
+        }
+        guard (200...299).contains(http.statusCode) else {
+            var data = Data()
+            for try await byte in stream { data.append(byte) }
+            if let errorJson = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let error = errorJson["error"] as? [String: Any],
+               let message = error["message"] as? String {
+                throw CustomProviderError.apiError("API Error (\(http.statusCode)): \(message)")
+            }
+            throw CustomProviderError.apiError("API Error: HTTP \(http.statusCode)")
+        }
+
+        for try await line in stream.lines {
+            if Task.isCancelled { break }
+            guard line.hasPrefix("data: ") else { continue }
+            let jsonStr = String(line.dropFirst(6))
+            if jsonStr.trimmingCharacters(in: .whitespaces) == "[DONE]" { break }
+            guard let data = jsonStr.data(using: .utf8),
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let choices = json["choices"] as? [[String: Any]],
+                  let delta = choices.first?["delta"] as? [String: Any],
+                  let content = delta["content"] as? String else { continue }
+            onChunk(content)
+        }
+    }
+
     func cancel() {
         currentTask?.cancel()
         currentTask = nil

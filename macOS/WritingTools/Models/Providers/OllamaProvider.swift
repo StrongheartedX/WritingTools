@@ -132,6 +132,89 @@ final class OllamaProvider: AIProvider {
         return try await task.value
     }
 
+    func processTextStreaming(
+        systemPrompt: String?,
+        userPrompt: String,
+        images: [Data],
+        onChunk: @escaping @MainActor (String) -> Void
+    ) async throws {
+        isProcessing = true
+        defer { isProcessing = false }
+
+        let imageMode = AppSettings.shared.ollamaImageMode
+
+        var combinedPrompt = ""
+        if let system = systemPrompt, !system.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            combinedPrompt = system + "\n\n"
+        }
+        combinedPrompt += userPrompt
+
+        var imagesForOllama: [String] = []
+        if !images.isEmpty {
+            switch imageMode {
+            case .ocr:
+                let ocrText = await OCRManager.shared.extractText(from: images)
+                if !ocrText.isEmpty {
+                    combinedPrompt += "\n\nExtracted Text: \(ocrText)"
+                }
+            case .ollama:
+                imagesForOllama = images.map { $0.base64EncodedString() }
+            }
+        }
+
+        guard let url = Self.makeEndpointURL(config.baseURL, path: "/generate") else {
+            throw Self.makeClientError("Invalid base URL '\(config.baseURL)'.")
+        }
+
+        var body: [String: Any] = [
+            "model": config.model,
+            "prompt": combinedPrompt,
+            "stream": true
+        ]
+        if let keepAlive = config.keepAlive, !keepAlive.isEmpty {
+            body["keep_alive"] = keepAlive
+        }
+        if !imagesForOllama.isEmpty {
+            body["images"] = imagesForOllama
+        }
+
+        let jsonData = try JSONSerialization.data(withJSONObject: body)
+
+        var requestBuilder = URLRequest(url: url)
+        requestBuilder.httpMethod = "POST"
+        requestBuilder.httpBody = jsonData
+        requestBuilder.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        requestBuilder.setValue("application/json", forHTTPHeaderField: "Accept")
+        requestBuilder.timeoutInterval = 60
+        let request = requestBuilder
+
+        let (stream, response) = try await URLSession.shared.bytes(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw Self.makeClientError("Invalid response from server.")
+        }
+
+        if http.statusCode != 200 {
+            var data = Data()
+            for try await byte in stream { data.append(byte) }
+            let message = Self.decodeServerError(from: data)
+            throw Self.makeServerError(http.statusCode, message)
+        }
+
+        for try await line in stream.lines {
+            if Task.isCancelled { break }
+            guard let data = line.data(using: .utf8) else { continue }
+            if let chunk = try? JSONDecoder().decode(GenerateChunk.self, from: data) {
+                if let t = chunk.response {
+                    onChunk(t)
+                }
+                if chunk.done == true { break }
+                if let err = chunk.error, !err.isEmpty {
+                    throw Self.makeServerError(500, err)
+                }
+            }
+        }
+    }
+
     func cancel() {
         currentTask?.cancel()
         currentTask = nil

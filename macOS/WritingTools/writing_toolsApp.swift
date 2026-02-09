@@ -27,11 +27,20 @@ struct MenuBarMenu: View {
     @Bindable var settings: AppSettings
     @Environment(\.openSettings) private var openSettings
     
+    @State private var showResetConfirmation = false
+    @State private var showResetComplete = false
+    
     var body: some View {
         // Settings - use Button with openSettings to ensure proper activation
         Button("Settings") {
-            NSApp.activate()
             openSettings()
+            // For accessory apps, activate after opening so the window
+            // comes to front above other applications.
+            DispatchQueue.main.async {
+                NSApp.activate()
+                NSApp.windows.first { $0.isVisible && $0.canBecomeKey }?
+                    .orderFrontRegardless()
+            }
         }
         .keyboardShortcut(",", modifiers: .command)
         
@@ -46,7 +55,28 @@ struct MenuBarMenu: View {
         Divider()
         
         Button("Reset App") {
-            confirmResetApp()
+            showResetConfirmation = true
+        }
+        .dialogSeverity(.critical)
+        .confirmationDialog(
+            "Reset Writing Tools?",
+            isPresented: $showResetConfirmation
+        ) {
+            Button("Reset", role: .destructive) {
+                WindowManager.shared.cleanupWindows()
+                showResetComplete = true
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will reset windows and UI state. Your commands and settings will remain.")
+        }
+        .alert(
+            "App Reset Complete",
+            isPresented: $showResetComplete
+        ) {
+            Button("OK") {}
+        } message: {
+            Text("The app has been reset. If you're still experiencing issues, try restarting the app.")
         }
         
         Divider()
@@ -57,19 +87,22 @@ struct MenuBarMenu: View {
         .keyboardShortcut("q", modifiers: .command)
     }
     
+    @State private var aboutWindow: NSWindow?
+
     private func showAboutWindow() {
         // Activate app first to ensure window becomes active
         NSApp.activate()
-        
-        // Find existing about window or create new one
-        if let existingWindow = NSApp.windows.first(where: { $0.identifier?.rawValue == "AboutWindow" }) {
-            existingWindow.makeKeyAndOrderFront(nil)
+
+        // Reuse existing window if it's still open
+        if let existing = aboutWindow, existing.isVisible {
+            existing.makeKeyAndOrderFront(nil)
+            existing.orderFrontRegardless()
             return
         }
-        
+
         let aboutView = AboutView()
         let hostingView = NSHostingView(rootView: aboutView)
-        
+
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 400, height: 400),
             styleMask: [.titled, .closable],
@@ -82,31 +115,8 @@ struct MenuBarMenu: View {
         window.title = "About Writing Tools"
         window.center()
         window.makeKeyAndOrderFront(nil)
-    }
-    
-    private func confirmResetApp() {
-        let alert = NSAlert()
-        alert.messageText = "Reset Writing Tools?"
-        alert.informativeText = "This will reset windows and UI state. Your commands and settings will remain."
-        alert.alertStyle = .warning
-        alert.addButton(withTitle: "Reset")
-        alert.addButton(withTitle: "Cancel")
-        alert.buttons.first?.hasDestructiveAction = true
-        
-        NSApp.activate()
-        if alert.runModal() == .alertFirstButtonReturn {
-            resetApp()
-        }
-    }
-    
-    private func resetApp() {
-        WindowManager.shared.cleanupWindows()
-        
-        let alert = NSAlert()
-        alert.messageText = "App Reset Complete"
-        alert.informativeText = "The app has been reset. If you're still experiencing issues, try restarting the app."
-        alert.alertStyle = .informational
-        alert.addButton(withTitle: "OK")
-        alert.runModal()
+        window.orderFrontRegardless()
+
+        aboutWindow = window
     }
 }

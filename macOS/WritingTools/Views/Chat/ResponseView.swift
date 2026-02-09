@@ -77,6 +77,19 @@ struct ResponseView: View {
             provider: provider
         ))
     }
+
+    /// Streaming initializer: opens immediately and streams the AI response.
+    init(selectedText: String, option: WritingOption? = nil, provider: any AIProvider,
+         systemPrompt: String, userPrompt: String, images: [Data]) {
+        self._viewModel = State(initialValue: ResponseViewModel(
+            selectedText: selectedText,
+            option: option,
+            provider: provider,
+            systemPrompt: systemPrompt,
+            userPrompt: userPrompt,
+            images: images
+        ))
+    }
     
     var body: some View {
         VStack(spacing: 0) {
@@ -138,8 +151,8 @@ struct ResponseView: View {
                                 .frame(maxWidth: .infinity, alignment: message.role == "user" ? .trailing : .leading)
                         }
                         
-                        // Show loading indicator
-                        if viewModel.isProcessing {
+                        // Show loading indicator only when processing and no streaming message is visible
+                        if viewModel.isProcessing && !(viewModel.messages.last?.isStreaming == true) {
                             HStack(alignment: .top, spacing: 12) {
                                 HStack(spacing: 8) {
                                     ProgressView()
@@ -273,10 +286,12 @@ struct ChatMessageView: View {
         VStack(alignment: role == "assistant" ? .leading : .trailing, spacing: 2) {
             Group {
                 if message.isStreaming && role == "assistant" {
-                    Text(message.content.isEmpty ? " " : message.content)
-                        .font(.system(size: fontSize))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .textSelection(.enabled)
+                    if !message.content.isEmpty {
+                        Text(message.content)
+                            .font(.system(size: fontSize))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .textSelection(.enabled)
+                    }
                 } else {
                     RichMarkdownView(text: message.content, fontSize: fontSize)
                         // Keep markdown constrained to bubble width while allowing vertical growth.
@@ -285,7 +300,7 @@ struct ChatMessageView: View {
                         .textSelection(.enabled)
                 }
             }
-            .chatBubbleStyle(isFromUser: message.role == "user")
+            .chatBubbleStyle(isFromUser: message.role == "user", isEmpty: message.isStreaming && message.content.isEmpty)
             .accessibilityLabel(message.role == "user" ? "Your message" : "Assistant's response")
             .accessibilityValue(message.content)
             .contextMenu {
@@ -401,6 +416,78 @@ final class ResponseViewModel {
         conversationHistory.append((role: "assistant", content: self.content))
     }
 
+    /// Streaming initializer: opens with an empty streaming message and begins generating immediately.
+    init(selectedText: String, option: WritingOption?, provider: any AIProvider,
+         systemPrompt: String, userPrompt: String, images: [Data]) {
+        self.content = ""
+        self.selectedText = selectedText
+        self.option = option
+        self.provider = provider
+
+        let savedFontSize = UserDefaults.standard.object(forKey: Self.fontSizeKey) as? CGFloat
+        self.fontSize = savedFontSize ?? Self.defaultFontSize
+
+        // Start with a streaming placeholder
+        messages.append(ChatMessage(role: "assistant", content: "", isStreaming: true))
+        isProcessing = true
+
+        if !selectedText.isEmpty {
+            conversationHistory.append((role: "user", content: selectedText))
+        }
+
+        // Kick off streaming
+        Task { @MainActor [weak self] in
+            await self?.streamInitialResponse(
+                systemPrompt: systemPrompt,
+                userPrompt: userPrompt,
+                images: images
+            )
+        }
+    }
+
+    /// Streams the initial AI response into the first message.
+    private func streamInitialResponse(systemPrompt: String, userPrompt: String, images: [Data]) async {
+        let messageIndex = 0
+
+        do {
+            var accumulatedContent = ""
+            var lastUIFlushTime = ContinuousClock.now
+            let minUIFlushInterval: Duration = .milliseconds(80)
+
+            try await provider.processTextStreaming(
+                systemPrompt: systemPrompt,
+                userPrompt: userPrompt,
+                images: images
+            ) { [self] chunk in
+                accumulatedContent += chunk
+                let now = ContinuousClock.now
+                if now - lastUIFlushTime >= minUIFlushInterval {
+                    if messageIndex < messages.count {
+                        messages[messageIndex].content = accumulatedContent
+                    }
+                    lastUIFlushTime = now
+                }
+            }
+
+            let normalizedResponse = accumulatedContent.normalizedForMarkdown()
+
+            if messageIndex < messages.count {
+                messages[messageIndex].content = normalizedResponse
+                messages[messageIndex].isStreaming = false
+            }
+
+            conversationHistory.append((role: "assistant", content: normalizedResponse))
+            isProcessing = false
+        } catch {
+            // Show error in the streaming message rather than removing it
+            if messageIndex < messages.count {
+                messages[messageIndex].content = "Error: \(error.localizedDescription)"
+                messages[messageIndex].isStreaming = false
+            }
+            isProcessing = false
+        }
+    }
+
     /// Debounced save of font size to UserDefaults
     private func scheduleFontSizeSave() {
         fontSizeSaveTask?.cancel()
@@ -463,8 +550,12 @@ final class ResponseViewModel {
                 messages[messageIndex].isStreaming = false
             }
             
-            // Add to conversation history
+            // Add to conversation history, keeping only the last 20 entries
+            // to prevent unbounded memory growth in long conversations
             conversationHistory.append((role: "assistant", content: normalizedResponse))
+            if conversationHistory.count > 20 {
+                conversationHistory.removeFirst(conversationHistory.count - 20)
+            }
             
             isProcessing = false
         } catch {

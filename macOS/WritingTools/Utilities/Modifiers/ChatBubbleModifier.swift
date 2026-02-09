@@ -2,22 +2,24 @@ import SwiftUI
 
 struct ChatBubbleModifier: ViewModifier {
     let isFromUser: Bool
+    var isEmpty: Bool = false
     
     func body(content: Content) -> some View {
-        let bubbleShape = ChatBubble(isFromUser: isFromUser)
+        let bubbleShape = ChatBubble()
         content
-            .padding()
+            .padding(isEmpty ? 0 : 16)
             .background(
                 bubbleShape
                     .fill(isFromUser ? Color.blue.opacity(0.15) :  Color(.controlBackgroundColor))
+                    .opacity(isEmpty ? 0 : 1)
             )
             .clipShape(bubbleShape)
     }
 }
 
 extension View {
-    func chatBubbleStyle(isFromUser: Bool) -> some View {
-        self.modifier(ChatBubbleModifier(isFromUser: isFromUser))
+    func chatBubbleStyle(isFromUser: Bool, isEmpty: Bool = false) -> some View {
+        self.modifier(ChatBubbleModifier(isFromUser: isFromUser, isEmpty: isEmpty))
     }
 }
 

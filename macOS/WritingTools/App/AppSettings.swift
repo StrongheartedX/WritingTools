@@ -219,12 +219,6 @@ final class AppSettings {
         self.enableICloudCommandSync = defaults.object(forKey: "enable_icloud_command_sync") as? Bool ?? false
     }
 
-    deinit {
-        keychainWriteTasks.values.forEach { $0.cancel() }
-        keychainWriteTasks.removeAll()
-        keychainWriteGenerations.removeAll()
-    }
-
     private func scheduleKeychainWrite(_ value: String, forKey key: String) {
         let generation = (keychainWriteGenerations[key] ?? 0) + 1
         keychainWriteGenerations[key] = generation

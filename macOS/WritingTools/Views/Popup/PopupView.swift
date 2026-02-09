@@ -106,37 +106,16 @@ struct PopupView: View {
         .padding(.horizontal)
         .onAppear {
           // Auto-focus the text field when popup appears for better keyboard accessibility
-          DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+          Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(100))
             isTextFieldFocused = true
           }
         }
       }
 
       if !appState.selectedText.isEmpty || !appState.selectedImages.isEmpty {
-        // Command buttons grid
-        LazyVGrid(columns: columns, spacing: 8) {
-          ForEach(appState.commandManager.commands) { command in
-            CommandButton(
-              command: command,
-              isEditing: viewModel.isEditMode,
-              isLoading: processingCommandId == command.id,
-              onTap: {
-                processingCommandId = command.id
-                Task {
-                  await processCommandAndCloseWhenDone(command)
-                }
-              },
-              onEdit: {
-                editingCommand = command
-              },
-              onDelete: {
-                logger.debug("Deleting command: \(command.name)")
-                appState.commandManager.deleteCommand(command)
-              }
-            )
-          }
-        }
-        .padding(.horizontal, 16)
+        commandButtonsGrid
+          .padding(.horizontal, 16)
       }
 
       if viewModel.isEditMode {
@@ -195,6 +174,45 @@ struct PopupView: View {
     }
   }
 
+  // MARK: - Command Buttons Grid
+
+  @ViewBuilder
+  private var commandButtonsGrid: some View {
+    let grid = LazyVGrid(columns: columns, spacing: 8) {
+      ForEach(appState.commandManager.commands) { command in
+        CommandButton(
+          command: command,
+          isEditing: viewModel.isEditMode,
+          isLoading: processingCommandId == command.id,
+          onTap: {
+            processingCommandId = command.id
+            Task {
+              await processCommandAndCloseWhenDone(command)
+            }
+          },
+          onEdit: {
+            editingCommand = command
+          },
+          onDelete: {
+            logger.debug("Deleting command: \(command.name)")
+            appState.commandManager.deleteCommand(command)
+          }
+        )
+      }
+    }
+
+    if #available(macOS 26, *) {
+      // GlassEffectContainer renders all glass effects in a single pass,
+      // ensuring consistent background adaptation across all buttons.
+      // spacing: 0 prevents shapes from blending into each other at rest.
+      GlassEffectContainer(spacing: 0) {
+        grid
+      }
+    } else {
+      grid
+    }
+  }
+
   // Process a command asynchronously and only close the popup when done
   private func processCommandAndCloseWhenDone(
     _ command: CommandModel
@@ -205,6 +223,7 @@ struct PopupView: View {
     }
 
     appState.isProcessing = true
+    defer { appState.isProcessing = false }
 
     do {
       let systemPrompt = command.prompt
@@ -214,33 +233,39 @@ struct PopupView: View {
       // Get the appropriate provider for this command (respects per-command overrides)
       let provider = appState.getProvider(for: command)
 
-      let result = try await provider.processText(
-        systemPrompt: systemPrompt,
-        userPrompt: input.userPrompt,
-        images: input.images,
-        streaming: false
-      )
+      let shouldUseResponseWindow = command.useResponseWindow || input.source == .imageOCRFallback
 
-      await MainActor.run {
-        let shouldUseResponseWindow = command.useResponseWindow || input.source == .imageOCRFallback
-        if shouldUseResponseWindow {
-          let window = ResponseWindow(
-            title: command.name,
-            content: result,
-            selectedText: input.source == .selectedText ? userText : "Image selection (OCR)",
-            option: .proofread,
-            provider: provider
-          )
+      if shouldUseResponseWindow {
+        // Open the response window immediately and stream the response inside it
+        let window = ResponseWindow(
+          title: command.name,
+          selectedText: input.source == .selectedText ? userText : "Image selection (OCR)",
+          option: .proofread,
+          provider: provider,
+          systemPrompt: systemPrompt,
+          userPrompt: input.userPrompt,
+          images: input.images
+        )
 
-          WindowManager.shared.addResponseWindow(window)
-          window.makeKeyAndOrderFront(nil)
-          window.orderFrontRegardless()
+        WindowManager.shared.addResponseWindow(window)
+        window.makeKeyAndOrderFront(nil)
+        window.orderFrontRegardless()
+
+        closeAction()
+        processingCommandId = nil
+      } else {
+        // Inline replacement: need the full response before pasting
+        let result = try await provider.processText(
+          systemPrompt: systemPrompt,
+          userPrompt: input.userPrompt,
+          images: input.images,
+          streaming: false
+        )
+
+        if command.preserveFormatting {
+          appState.replaceSelectedTextPreservingAttributes(with: result)
         } else {
-          if command.preserveFormatting {
-            appState.replaceSelectedTextPreservingAttributes(with: result)
-          } else {
-            appState.replaceSelectedText(with: result)
-          }
+          appState.replaceSelectedText(with: result)
         }
 
         closeAction()
@@ -248,15 +273,9 @@ struct PopupView: View {
       }
     } catch {
       logger.error("Error processing command: \(error.localizedDescription)")
-      await MainActor.run {
-        errorMessage = error.localizedDescription
-        showingErrorAlert = true
-        processingCommandId = nil
-      }
-    }
-
-    await MainActor.run {
-      appState.isProcessing = false
+      errorMessage = error.localizedDescription
+      showingErrorAlert = true
+      processingCommandId = nil
     }
   }
 
@@ -273,68 +292,73 @@ struct PopupView: View {
     // Capture setting value once at the start
     let openInResponseWindow = AppSettings.shared.openCustomCommandsInResponseWindow
 
-    Task {
-      do {
-        let systemPrompt = """
-        You are a writing and coding assistant. Your sole task is to respond \
-        to the user's instruction thoughtfully and comprehensively.
-        If the instruction is a question, provide a detailed answer. But \
-        always return the best and most accurate answer and not different \
-        options.
-        If it's a request for help, provide clear guidance and examples where \
-        appropriate. Make sure to use the language used or specified by the \
-        user instruction.
-        Use Markdown formatting to make your response more readable.
+    let systemPrompt = """
+    You are a writing and coding assistant. Your sole task is to respond \
+    to the user's instruction thoughtfully and comprehensively.
+    If the instruction is a question, provide a detailed answer. But \
+    always return the best and most accurate answer and not different \
+    options.
+    If it's a request for help, provide clear guidance and examples where \
+    appropriate. Make sure to use the language used or specified by the \
+    user instruction.
+    Use Markdown formatting to make your response more readable.
+    """
+
+    let userPrompt = appState.selectedText.isEmpty
+      ? instruction
+      : """
+        User's instruction: \(instruction)
+
+        Text:
+        \(appState.selectedText)
         """
 
-        let userPrompt = appState.selectedText.isEmpty
-          ? instruction
-          : """
-            User's instruction: \(instruction)
+    if openInResponseWindow {
+      // Open the response window immediately and stream inside it
+      let window = ResponseWindow(
+        title: "AI Response",
+        selectedText: appState.selectedText.isEmpty
+          ? instruction : appState.selectedText,
+        option: .proofread,
+        provider: appState.activeProvider,
+        systemPrompt: systemPrompt,
+        userPrompt: userPrompt,
+        images: appState.selectedImages
+      )
 
-            Text:
-            \(appState.selectedText)
-            """
+      WindowManager.shared.addResponseWindow(window)
+      window.makeKeyAndOrderFront(nil)
+      window.orderFrontRegardless()
 
-        let result = try await appState.activeProvider.processText(
-          systemPrompt: systemPrompt,
-          userPrompt: userPrompt,
-          images: appState.selectedImages,
-          streaming: false
-        )
+      customText = ""
+      isCustomLoading = false
+      appState.isProcessing = false
+      closeAction()
+    } else {
+      // Inline replacement: need the full response before pasting
+      Task {
+        defer { appState.isProcessing = false }
 
-        await MainActor.run {
-          if openInResponseWindow {
-            let window = ResponseWindow(
-              title: "AI Response",
-              content: result,
-              selectedText: appState.selectedText.isEmpty
-                ? instruction : appState.selectedText,
-              option: .proofread,
-              provider: appState.activeProvider
-            )
+        do {
+          let result = try await appState.activeProvider.processText(
+            systemPrompt: systemPrompt,
+            userPrompt: userPrompt,
+            images: appState.selectedImages,
+            streaming: false
+          )
 
-            WindowManager.shared.addResponseWindow(window)
-            window.makeKeyAndOrderFront(nil)
-            window.orderFrontRegardless()
-          } else {
-            appState.replaceSelectedText(with: result)
-          }
+          appState.replaceSelectedText(with: result)
 
           customText = ""
           isCustomLoading = false
           closeAction()
-        }
-      } catch {
-        logger.error("Error processing text: \(error.localizedDescription)")
-        await MainActor.run {
+        } catch {
+          logger.error("Error processing text: \(error.localizedDescription)")
           errorMessage = error.localizedDescription
           showingErrorAlert = true
           isCustomLoading = false
         }
       }
-
-      appState.isProcessing = false
     }
   }
 }

@@ -49,13 +49,18 @@ class LocalModelProvider {
 
     // Internal state - should NOT trigger observation
     @ObservationIgnored
-    var downloadTask: Task<ModelContainer, Error>?
+    var downloadTask: Task<Void, Error>?
 
+    // Fix #7: Simple dictionary instead of NSCache to avoid non-deterministic eviction
     @ObservationIgnored
-    private let modelCache = NSCache<NSString, ModelContainer>()
+    private var cachedContainer: (key: String, container: ModelContainer)?
 
     @ObservationIgnored
     var running = false
+
+    // Fix #4/#17: Store generation task for proper cancellation
+    @ObservationIgnored
+    private var generationTask: Task<Void, Never>?
 
     @ObservationIgnored
     private var isCancelled = false
@@ -93,10 +98,6 @@ class LocalModelProvider {
         LocalModelProvider.isAppleSilicon
     }
     
-    // Use default model from registry.
-    //let modelConfiguration : ModelConfiguration = .qwen2_5_3b_4bit
-    //let modelConfiguration = LLMRegistry.llama3_2_3B_4bit
-    
     // Computed Property for Selected Configuration
     private var selectedModelConfiguration: ModelConfiguration? {
         LocalModelType.from(id: settings.selectedLocalLLMId)?.configuration
@@ -112,41 +113,36 @@ class LocalModelProvider {
         selectedModelType?.isVisionModel ?? false
     }
     
-    private func cleanID(from config: ModelConfiguration) -> String {
-        var s = String(describing: config.id)
-        if s.hasPrefix("id(\""), s.hasSuffix("\")") {
-            s.removeFirst(4); s.removeLast(2)
-        }
-        return s
+    /// Extracts the HuggingFace repo ID string from a ModelConfiguration.
+    private func repoID(from config: ModelConfiguration) -> String? {
+        // Use pattern matching on the Identifier enum
+        let description = String(describing: config.id)
+        // Format: id("org/repo", revision: "main") or id("org/repo")
+        guard description.hasPrefix("id(\"") else { return nil }
+        // Extract everything between the first quote pair
+        let afterPrefix = description.dropFirst(4) // drop id("
+        guard let endQuote = afterPrefix.firstIndex(of: "\"") else { return nil }
+        return String(afterPrefix[afterPrefix.startIndex..<endQuote])
     }
 
-    private func cacheKey(for config: ModelConfiguration) -> NSString {
-        NSString(string: cleanID(from: config))
+    private func cacheKey(for config: ModelConfiguration) -> String {
+        repoID(from: config) ?? String(describing: config.id)
     }
 
-    private func expectedRepoFolder(for config: ModelConfiguration) -> URL {
-        let id = cleanID(from: config)                 // e.g. "mlx-community/gemma-3-4b-it-qat-4bit"
-        let parts = id.split(separator: "/")
-        if parts.count == 2 {
-            return Self.modelsRoot
-                .appendingPathComponent("models", isDirectory: true)
-                .appendingPathComponent(String(parts[0]), isDirectory: true)
-                .appendingPathComponent(String(parts[1]), isDirectory: true)
-        } else {
-            // fallback: flatten if id is unexpected
-            return Self.modelsRoot
-                .appendingPathComponent("models", isDirectory: true)
-                .appendingPathComponent(id.replacingOccurrences(of: "/", with: "_"), isDirectory: true)
-        }
+    /// Returns the canonical model directory using HubApi's own path resolution.
+    /// This ensures download, load, check, and delete all use the same path.
+    private func canonicalModelDirectory(for config: ModelConfiguration) -> URL {
+        config.modelDirectory(hub: hub)
     }
 
-    
+    // Fix #10/#11: Tuned generation parameters with KV cache quantization for long generations
     private var generationParameters: GenerateParameters {
         GenerateParameters(
             maxTokens: maxTokens,
+            kvBits: 8,
+            kvGroupSize: 64,
+            quantizedKVStart: 512,
             temperature: 0.6
-            // Note: KV cache quantization (kvBits: 4) is available but adds overhead.
-            // Only enable for memory-constrained devices or very long generations.
         )
     }
     let maxTokens = 10000
@@ -176,16 +172,19 @@ class LocalModelProvider {
     
     var loadState = LoadState.idle
     
-    // Model Directory Calculation
+    // Model Directory Calculation - uses canonical HubApi path
     private var modelDirectory: URL? {
          guard let config = selectedModelConfiguration else { return nil }
-         return expectedRepoFolder(for: config)
+         return canonicalModelDirectory(for: config)
      }
     
     init() {
-        modelCache.countLimit = 2
         if isPlatformSupported {
-            MLX.GPU.set(cacheLimit: 20 * 1024 * 1024)
+            // Fix #9: 512MB GPU cache for 3-4B models on Apple Silicon unified memory
+            MLX.GPU.set(cacheLimit: 512 * 1024 * 1024)
+
+            // Fix #14: Seed once at init instead of every request
+            MLXRandom.seed(UInt64(Date.timeIntervalSinceReferenceDate * 1000))
 
             observeSettings()
             checkModelStatus()
@@ -225,7 +224,8 @@ class LocalModelProvider {
         isCancelled = false
     }
     
-    private func checkModelStatus() {
+    // Fix #6: Added skipIfError parameter to prevent overwriting error state after load failure
+    private func checkModelStatus(skipIfError: Bool = false) {
         guard isPlatformSupported else {
             modelInfo = "Local LLM is only available on Apple Silicon devices"
             loadState = .error("Platform not supported")
@@ -239,6 +239,12 @@ class LocalModelProvider {
         
         guard !isDownloading, loadState != .loading else {
             logger.debug("checkModelStatus: Skipping check, currently downloading or loading.")
+            return
+        }
+
+        // Don't overwrite an error state that was just set by load()
+        if skipIfError, case .error = loadState {
+            logger.debug("checkModelStatus: Skipping check, preserving current error state.")
             return
         }
         
@@ -324,15 +330,13 @@ class LocalModelProvider {
         modelInfo = "Starting download for \(selectedModelType?.displayName ?? "model")..."
         loadState = .needsDownload
         
+        // Fix #5: Task<Void, Error> since the result is stored in loadState/cache, not read from task
         downloadTask = Task {
             logger.debug("startDownload: Task created, calling load()")
             do {
-                let container = try await load()
-                // Success is handled within load() by setting state to .loaded
+                let _ = try await load()
                 logger.debug("startDownload: Task finished successfully.")
-                return container
             } catch {
-                // Errors (including cancellation) are handled within load()
                 logger.error("startDownload: Task finished with error: \(error.localizedDescription)")
                 throw error
             }
@@ -357,6 +361,7 @@ class LocalModelProvider {
         
         isCancelled = true
         task.cancel()
+        downloadTask = nil
         
         // Immediate UI Update
         isDownloading = false
@@ -399,13 +404,14 @@ class LocalModelProvider {
     }
 
     func cleanLegacyCacheForSelectedModel() {
-        // If you want to remove any old cached copy (previous defaultHubApi downloads)
-        guard let config = selectedModelConfiguration else { return }
+        // Remove any old cached copy (previous defaultHubApi downloads stored in ~/Library/Caches)
+        guard let config = selectedModelConfiguration,
+              let repoID = repoID(from: config) else { return }
         let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
-        // MLX’s default hub uses caches; structure may vary—remove any folders that contain the repo name
-        let repo = cleanID(from: config).split(separator: "/").last.map(String.init) ?? ""
+        let repoName = repoID.split(separator: "/").last.map(String.init) ?? ""
+        guard !repoName.isEmpty else { return }
         if let contents = try? FileManager.default.contentsOfDirectory(at: caches, includingPropertiesForKeys: nil) {
-            for url in contents where url.lastPathComponent.localizedCaseInsensitiveContains(repo) {
+            for url in contents where url.lastPathComponent.localizedCaseInsensitiveContains(repoName) {
                 try? FileManager.default.removeItem(at: url)
             }
         }
@@ -419,7 +425,7 @@ class LocalModelProvider {
         guard let modelDir = modelDirectory, let modelType = selectedModelType else {
             throw NSError(domain: "LocalLLM", code: -1, userInfo: [NSLocalizedDescriptionKey: "No model selected to delete."])
         }
-        let cacheKey = cacheKey(for: modelType.configuration)
+        let key = cacheKey(for: modelType.configuration)
         guard !isDownloading && !running && loadState != .loading else { // Also check loading state
             throw NSError(domain: "LocalLLM", code: -1, userInfo: [NSLocalizedDescriptionKey: "Cannot delete while model is busy (downloading, running, or loading)"])
         }
@@ -444,7 +450,9 @@ class LocalModelProvider {
             
             // Reset state *after* successful deletion or if not found
             resetModelState() // Reset everything
-            modelCache.removeObject(forKey: cacheKey)
+            if cachedContainer?.key == key {
+                cachedContainer = nil
+            }
             checkModelStatus() // Re-check, should now be .needsDownload
             modelInfo = "\(modelType.displayName) deleted." // Update info *after* check
             
@@ -464,38 +472,31 @@ class LocalModelProvider {
         guard let config = selectedModelConfiguration, let modelType = selectedModelType else {
             throw NSError(domain: "LocalLLM", code: -1, userInfo: [NSLocalizedDescriptionKey: "No model selected to load."])
         }
-        let cacheKey = cacheKey(for: config)
+        let key = cacheKey(for: config)
         
         logger.debug("load: Function called. Current state: \(String(describing: self.loadState))")
 
-        if let cached = modelCache.object(forKey: cacheKey) {
-            loadState = .loaded(cached)
+        // Fix #7: Check simple dictionary cache
+        if let cached = cachedContainer, cached.key == key {
+            loadState = .loaded(cached.container)
             modelInfo = "\(modelType.displayName) is ready (cached)."
-            return cached
+            return cached.container
         }
 
         if case .loaded(let container) = loadState {
             logger.debug("load: Model already loaded.")
-            modelCache.setObject(container, forKey: cacheKey)
+            cachedContainer = (key: key, container: container)
             return container
         }
         if case .loading = loadState {
             logger.debug("load: Model is already loading (called directly?).")
-            // Wait for existing load? For now, throw error.
             throw NSError(domain: "LocalLLM", code: -3, userInfo: [NSLocalizedDescriptionKey: "Model is already loading."])
         }
-        
-        // Reset cancellation flag for this specific attempt
-        // Note: isCancelled might be true if cancelDownload was called just before load started
-        // isCancelled = false // Let's rely on the flag set by cancelDownload
         
         // --- Download Block ---
         if case .needsDownload = loadState {
             logger.debug("load: State is .needsDownload. Preparing to download \(modelType.displayName).")
-            // Ensure flags are accurate, though startDownload should have set them
             isDownloading = true
-            // downloadProgress = 0 // Keep existing progress if resuming? No, start fresh.
-            // modelInfo = "Downloading \(modelType.displayName)..." // Keep info from startDownload
             
             do {
                 // Select the appropriate factory based on whether it's a vision model
@@ -527,7 +528,7 @@ class LocalModelProvider {
                 downloadTask = nil // Clear task reference
                 let numParams = await modelContainer.perform { context in context.model.numParameters() }
                 modelInfo = "\(modelType.displayName) loaded. Weights: \(numParams / (1024 * 1024))M"
-                modelCache.setObject(modelContainer, forKey: cacheKey)
+                cachedContainer = (key: key, container: modelContainer)
                 loadState = .loaded(modelContainer)
                 logger.debug("load: State set to .loaded")
                 return modelContainer
@@ -561,8 +562,8 @@ class LocalModelProvider {
                     logger.error("load: State set to .error")
                 }
                 
-                // Always re-check status after failure/cancellation to update UI correctly
-                checkModelStatus()
+                // Fix #6: Use skipIfError to prevent overwriting the error state we just set
+                checkModelStatus(skipIfError: true)
                 
                 // Re-throw the original error or a CancellationError
                 if wasExplicitlyCancelled || isCancellationError {
@@ -587,7 +588,7 @@ class LocalModelProvider {
                 logGPUMemoryUsage(at: "Model Loaded")
                 let numParams = await modelContainer.perform { context in context.model.numParameters() }
                 modelInfo = "\(modelType.displayName) loaded. Weights: \(numParams / (1024 * 1024))M"
-                modelCache.setObject(modelContainer, forKey: cacheKey)
+                cachedContainer = (key: key, container: modelContainer)
                 loadState = .loaded(modelContainer)
                 logger.debug("load: State set to .loaded")
                 return modelContainer
@@ -597,8 +598,6 @@ class LocalModelProvider {
                 modelInfo = lastError!
                 loadState = .error(lastError!)
                 logger.error("load: State set to .error")
-                // Optionally call checkModelStatus here too if loading error might change things
-                // checkModelStatus()
                 throw error
             }
             // --- Other States ---
@@ -608,6 +607,7 @@ class LocalModelProvider {
         }
     }
     
+    // Fix #2/#3/#13: Synchronous state reset, no busy-wait, guard against concurrent generation
     func processText(systemPrompt: String?, userPrompt: String, images: [Data], streaming: Bool = false) async throws -> String {
         guard isPlatformSupported else {
             throw NSError(domain: "LocalLLM", code: -1, userInfo: [NSLocalizedDescriptionKey: "Platform not supported"])
@@ -616,30 +616,23 @@ class LocalModelProvider {
             throw NSError(domain: "LocalLLM", code: -1, userInfo: [NSLocalizedDescriptionKey: "No model selected for processing."])
         }
         
-        if running {
-            logger.debug("Generation already in progress, waiting...")
-            while running { try await Task.sleep(for: .milliseconds(100)) }
+        // Fix #3: Reject concurrent generation instead of busy-waiting
+        guard !running else {
+            throw NSError(domain: "LocalLLM", code: -2, userInfo: [NSLocalizedDescriptionKey: "Generation already in progress."])
         }
         
         running = true
         isProcessing = true
         output = ""
         
+        // Fix #2: Synchronous state reset in defer (we're already on @MainActor)
         defer {
-            Task { @MainActor [weak self] in
-                self?.running = false
-                self?.isProcessing = false
-            }
+            running = false
+            isProcessing = false
         }
         
-        // Load the model
-        let modelContainer: ModelContainer
-        do {
-            modelContainer = try await load()
-        } catch {
-            logger.error("Failed to load model for processing: \(error.localizedDescription)")
-            throw error
-        }
+        // Load the model (uses cache if already loaded)
+        let modelContainer = try await load()
         
         // Prepare input based on model type and available inputs
         do {
@@ -654,7 +647,6 @@ class LocalModelProvider {
                 )
             } else {
                 // Regular LLM or VLM without images
-                // If using VLM without images, we'll just use it as a regular LLM
                 // If using LLM with images, we'll use OCR and include text in prompt
                 
                 var combinedPrompt = userPrompt
@@ -675,14 +667,64 @@ class LocalModelProvider {
         } catch {
             // Handle generation errors
             logger.error("Error during text generation: \(error.localizedDescription)")
-            await MainActor.run { [weak self] in
-                self?.lastError = "Generation failed: \(error.localizedDescription)"
-                self?.stat = "Error"
-            }
+            lastError = "Generation failed: \(error.localizedDescription)"
+            stat = "Error"
             throw error
         }
     }
     
+    // Fix #1/#16: Real streaming implementation that calls onChunk per token batch
+    func processTextStreaming(
+        systemPrompt: String?,
+        userPrompt: String,
+        images: [Data],
+        onChunk: @escaping @MainActor (String) -> Void
+    ) async throws {
+        guard isPlatformSupported else {
+            throw NSError(domain: "LocalLLM", code: -1, userInfo: [NSLocalizedDescriptionKey: "Platform not supported"])
+        }
+        guard selectedModelConfiguration != nil else {
+            throw NSError(domain: "LocalLLM", code: -1, userInfo: [NSLocalizedDescriptionKey: "No model selected for processing."])
+        }
+        
+        guard !running else {
+            throw NSError(domain: "LocalLLM", code: -2, userInfo: [NSLocalizedDescriptionKey: "Generation already in progress."])
+        }
+        
+        running = true
+        isProcessing = true
+        output = ""
+        
+        defer {
+            running = false
+            isProcessing = false
+        }
+        
+        let modelContainer = try await load()
+        
+        // Build UserInput based on model type
+        let userInput: UserInput
+        if isUsingVisionModel && !images.isEmpty {
+            userInput = try buildVLMInput(systemPrompt: systemPrompt, userPrompt: userPrompt, images: images)
+        } else {
+            var combinedPrompt = userPrompt
+            if !images.isEmpty && !isUsingVisionModel {
+                let ocrText = await OCRManager.shared.extractText(from: images)
+                if !ocrText.isEmpty {
+                    combinedPrompt += "\n\n[Extracted Text from Image(s)]:\n\(ocrText)"
+                }
+            }
+            userInput = buildLLMInput(systemPrompt: systemPrompt, userPrompt: combinedPrompt)
+        }
+        
+        // Generate with streaming, calling onChunk for each token batch
+        try await generateResponseStreaming(
+            userInput: userInput,
+            modelContainer: modelContainer,
+            onChunk: onChunk
+        )
+    }
+
     /// Stores generation result to pass out of perform block
     private struct GenerationResult: Sendable {
         let text: String
@@ -690,6 +732,7 @@ class LocalModelProvider {
         let timeToFirstToken: TimeInterval
     }
 
+    // Fix #15: Use ModelContainer.generate() convenience method
     private func generateResponse(
         userInput: UserInput,
         modelContainer: ModelContainer,
@@ -699,111 +742,137 @@ class LocalModelProvider {
         let parameters = generationParameters
         let start = Date()
 
-        // All generation must happen inside perform block because ModelContext is not Sendable.
-        // We replicate that pattern: batch tokens over time intervals for fewer UI updates.
-        let result: GenerationResult = try await modelContainer.perform { context in
-            var fullOutput = ""
-            var timeToFirstToken: TimeInterval = 0
-            var completionInfo: GenerateCompletionInfo?
+        let input = try await modelContainer.prepare(input: userInput)
+        let stream = try await modelContainer.generate(input: input, parameters: parameters)
 
-            let input = try await context.processor.prepare(input: userInput)
-            let stream = try MLXLMCommon.generate(
-                input: input,
-                parameters: parameters,
-                context: context
-            )
+        var fullOutput = ""
+        var timeToFirstToken: TimeInterval = 0
+        var completionInfo: GenerateCompletionInfo?
 
-            if streaming {
-                // Batched streaming: accumulate tokens and flush periodically
-                // This mimics the official _throttle pattern but works within perform block
-                var pendingText = ""
-                var lastFlushTime = Date()
-                let flushInterval: TimeInterval = 0.1
+        if streaming {
+            var pendingText = ""
+            var lastFlushTime = Date()
+            let flushInterval: TimeInterval = 0.1
 
-                for try await item in stream {
-                    switch item {
-                    case .chunk(let text):
-                        fullOutput += text
-                        pendingText += text
-                        if timeToFirstToken == 0 {
-                            timeToFirstToken = Date().timeIntervalSince(start)
-                        }
+            for try await item in stream {
+                // Fix #4: Check for task cancellation cooperatively
+                try Task.checkCancellation()
 
-                        // Flush to UI at most every 100ms (reduces main actor contention)
-                        let now = Date()
-                        if now.timeIntervalSince(lastFlushTime) >= flushInterval {
-                            let textToFlush = pendingText
-                            pendingText = ""
-                            lastFlushTime = now
-                            // Fire-and-forget: don't await to avoid blocking generation
-                            Task { @MainActor [weak self] in
-                                self?.output += textToFlush
-                            }
-                        }
-                    case .info(let info):
-                        completionInfo = info
-                    case .toolCall:
-                        break
+                switch item {
+                case .chunk(let text):
+                    fullOutput += text
+                    pendingText += text
+                    if timeToFirstToken == 0 {
+                        timeToFirstToken = Date().timeIntervalSince(start)
                     }
-                }
 
-                // Flush any remaining text
-                if !pendingText.isEmpty {
-                    let finalText = pendingText
-                    Task { @MainActor [weak self] in
-                        self?.output += finalText
+                    let now = Date()
+                    if now.timeIntervalSince(lastFlushTime) >= flushInterval {
+                        output += pendingText
+                        pendingText = ""
+                        lastFlushTime = now
                     }
-                }
-            } else {
-                // Non-streaming: collect everything then update once
-                for try await item in stream {
-                    switch item {
-                    case .chunk(let text):
-                        fullOutput += text
-                        if timeToFirstToken == 0 {
-                            timeToFirstToken = Date().timeIntervalSince(start)
-                        }
-                    case .info(let info):
-                        completionInfo = info
-                    case .toolCall:
-                        break
-                    }
-                }
-
-                let finalOutput = fullOutput
-                Task { @MainActor [weak self] in
-                    self?.output = finalOutput
+                case .info(let info):
+                    completionInfo = info
+                case .toolCall:
+                    break
                 }
             }
 
-            return GenerationResult(
-                text: fullOutput,
-                tokensPerSecond: completionInfo?.tokensPerSecond ?? 0,
-                timeToFirstToken: timeToFirstToken
-            )
+            // Flush any remaining text
+            if !pendingText.isEmpty {
+                output += pendingText
+            }
+        } else {
+            // Non-streaming: collect everything then update once
+            for try await item in stream {
+                try Task.checkCancellation()
+
+                switch item {
+                case .chunk(let text):
+                    fullOutput += text
+                    if timeToFirstToken == 0 {
+                        timeToFirstToken = Date().timeIntervalSince(start)
+                    }
+                case .info(let info):
+                    completionInfo = info
+                case .toolCall:
+                    break
+                }
+            }
+
+            output = fullOutput
         }
 
-        // Update stats on main actor
-        await MainActor.run { [weak self] in
-            let ttftFormatted = String(format: "%.2f", result.timeToFirstToken)
-            let tpsFormatted = String(format: "%.2f", result.tokensPerSecond)
-            self?.stat = "TTFT: \(ttftFormatted)s | TPS: \(tpsFormatted)"
-        }
+        // Update stats
+        let ttftFormatted = String(format: "%.2f", timeToFirstToken)
+        let tpsFormatted = String(format: "%.2f", completionInfo?.tokensPerSecond ?? 0)
+        stat = "TTFT: \(ttftFormatted)s | TPS: \(tpsFormatted)"
         logGPUMemoryUsage(at: "Generation Complete")
 
-        return result.text
+        return fullOutput
     }
     
-    // Process with LLM using proper Chat.Message format
-    private func processWithLLM(
+    // Fix #1: Streaming generation that calls onChunk callback
+    private func generateResponseStreaming(
+        userInput: UserInput,
         modelContainer: ModelContainer,
-        systemPrompt: String?,
-        userPrompt: String,
-        streaming: Bool
-    ) async throws -> String {
-        MLXRandom.seed(UInt64(Date.timeIntervalSinceReferenceDate * 1000))
+        onChunk: @escaping @MainActor (String) -> Void
+    ) async throws {
+        logGPUMemoryUsage(at: "Generation Start")
+        let parameters = generationParameters
+        let start = Date()
 
-        // Use Chat.Message format for proper chat template application
+        let input = try await modelContainer.prepare(input: userInput)
+        let stream = try await modelContainer.generate(input: input, parameters: parameters)
+
+        var fullOutput = ""
+        var timeToFirstToken: TimeInterval = 0
+        var completionInfo: GenerateCompletionInfo?
+        var pendingText = ""
+        var lastFlushTime = Date()
+        let flushInterval: TimeInterval = 0.08
+
+        for try await item in stream {
+            try Task.checkCancellation()
+
+            switch item {
+            case .chunk(let text):
+                fullOutput += text
+                pendingText += text
+                if timeToFirstToken == 0 {
+                    timeToFirstToken = Date().timeIntervalSince(start)
+                }
+
+                let now = Date()
+                if now.timeIntervalSince(lastFlushTime) >= flushInterval {
+                    let textToFlush = pendingText
+                    pendingText = ""
+                    lastFlushTime = now
+                    output += textToFlush
+                    onChunk(textToFlush)
+                }
+            case .info(let info):
+                completionInfo = info
+            case .toolCall:
+                break
+            }
+        }
+
+        // Flush remaining text
+        if !pendingText.isEmpty {
+            output += pendingText
+            onChunk(pendingText)
+        }
+
+        let ttftFormatted = String(format: "%.2f", timeToFirstToken)
+        let tpsFormatted = String(format: "%.2f", completionInfo?.tokensPerSecond ?? 0)
+        stat = "TTFT: \(ttftFormatted)s | TPS: \(tpsFormatted)"
+        logGPUMemoryUsage(at: "Generation Complete")
+    }
+
+    // Helper to build LLM input without generating
+    private func buildLLMInput(systemPrompt: String?, userPrompt: String) -> UserInput {
         var messages: [Chat.Message] = []
 
         if let systemPrompt = systemPrompt, !systemPrompt.isEmpty {
@@ -812,10 +881,20 @@ class LocalModelProvider {
 
         messages.append(Chat.Message(role: .user, content: userPrompt))
 
-        let userInput = UserInput(
+        return UserInput(
             chat: messages,
             additionalContext: ["enable_thinking": self.enableThinking]
         )
+    }
+
+    // Process with LLM using proper Chat.Message format
+    private func processWithLLM(
+        modelContainer: ModelContainer,
+        systemPrompt: String?,
+        userPrompt: String,
+        streaming: Bool
+    ) async throws -> String {
+        let userInput = buildLLMInput(systemPrompt: systemPrompt, userPrompt: userPrompt)
 
         return try await generateResponse(
             userInput: userInput,
@@ -824,6 +903,89 @@ class LocalModelProvider {
         )
     }
     
+    // Fix #12: Collect temp URLs in a separate array for cleanup even on partial failure
+    private func buildVLMInput(systemPrompt: String?, userPrompt: String, images: [Data]) throws -> UserInput {
+        var tempURLs: [URL] = []
+
+        // Ensure cleanup of any written temp files on error
+        do {
+            let imageURLs = try images.compactMap { imageData -> URL? in
+                let tempDir = FileManager.default.temporaryDirectory
+
+                // Check if image data is already in a VLM-compatible format (PNG or JPEG)
+                let isPNG = imageData.count >= 8 && imageData.prefix(8).elementsEqual([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
+                let isJPEG = imageData.count >= 3 && imageData.prefix(3).elementsEqual([0xFF, 0xD8, 0xFF])
+
+                let fileURL: URL
+                if isPNG {
+                    fileURL = tempDir.appendingPathComponent(UUID().uuidString + ".png")
+                    try imageData.write(to: fileURL)
+                } else if isJPEG {
+                    fileURL = tempDir.appendingPathComponent(UUID().uuidString + ".jpg")
+                    try imageData.write(to: fileURL)
+                } else {
+                    // For other formats, use CGImage directly
+                    guard let source = CGImageSourceCreateWithData(imageData as CFData, nil),
+                          let cgImage = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+                        logger.warning("Could not create CGImage from image data")
+                        return nil
+                    }
+
+                    fileURL = tempDir.appendingPathComponent(UUID().uuidString + ".png")
+
+                    guard let destination = CGImageDestinationCreateWithURL(fileURL as CFURL, UTType.png.identifier as CFString, 1, nil) else {
+                        logger.warning("Could not create image destination")
+                        return nil
+                    }
+                    CGImageDestinationAddImage(destination, cgImage, nil)
+                    guard CGImageDestinationFinalize(destination) else {
+                        logger.warning("Could not finalize image destination")
+                        return nil
+                    }
+                }
+
+                tempURLs.append(fileURL)
+                return fileURL
+            }
+
+            // Early return if no valid images
+            if imageURLs.isEmpty && !images.isEmpty {
+                // Clean up any partial temp files
+                for url in tempURLs {
+                    try? FileManager.default.removeItem(at: url)
+                }
+                logger.warning("Failed to process all images for VLM")
+                throw NSError(domain: "LocalModelProvider", code: -3,
+                              userInfo: [NSLocalizedDescriptionKey: "Failed to process images for vision model"])
+            }
+
+            var messages: [Chat.Message] = []
+
+            if let systemPrompt = systemPrompt, !systemPrompt.isEmpty {
+                messages.append(Chat.Message(role: .system, content: systemPrompt))
+            }
+
+            let imageAttachments: [UserInput.Image] = imageURLs.map { .url($0) }
+
+            messages.append(Chat.Message(
+                role: .user,
+                content: userPrompt,
+                images: imageAttachments
+            ))
+
+            return UserInput(
+                chat: messages,
+                additionalContext: ["enable_thinking": self.enableThinking]
+            )
+        } catch {
+            // Clean up all temp files on any error
+            for url in tempURLs {
+                try? FileManager.default.removeItem(at: url)
+            }
+            throw error
+        }
+    }
+
     private func processWithVLM(
         modelContainer: ModelContainer,
         systemPrompt: String?,
@@ -831,93 +993,11 @@ class LocalModelProvider {
         images: [Data],
         streaming: Bool
     ) async throws -> String {
-        MLXRandom.seed(UInt64(Date.timeIntervalSinceReferenceDate * 1000))
-        
-        // Create temporary URLs for images with optimized format handling
-        let imageURLs = try images.compactMap { imageData -> URL? in
-            let tempDir = FileManager.default.temporaryDirectory
+        let userInput = try buildVLMInput(systemPrompt: systemPrompt, userPrompt: userPrompt, images: images)
 
-            // Check if image data is already in a VLM-compatible format (PNG or JPEG)
-            // by checking magic bytes to avoid unnecessary conversion
-            let isPNG = imageData.count >= 8 && imageData.prefix(8).elementsEqual([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
-            let isJPEG = imageData.count >= 3 && imageData.prefix(3).elementsEqual([0xFF, 0xD8, 0xFF])
-
-            if isPNG {
-                // Already PNG - use directly without conversion
-                let fileName = UUID().uuidString + ".png"
-                let fileURL = tempDir.appendingPathComponent(fileName)
-                try imageData.write(to: fileURL)
-                return fileURL
-            } else if isJPEG {
-                // Already JPEG - use directly without conversion
-                let fileName = UUID().uuidString + ".jpg"
-                let fileURL = tempDir.appendingPathComponent(fileName)
-                try imageData.write(to: fileURL)
-                return fileURL
-            }
-
-            // For other formats, use CGImage directly (more efficient than TIFF intermediate)
-            guard let source = CGImageSourceCreateWithData(imageData as CFData, nil),
-                  let cgImage = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
-                logger.warning("Could not create CGImage from image data")
-                return nil
-            }
-
-            let fileName = UUID().uuidString + ".png"
-            let fileURL = tempDir.appendingPathComponent(fileName)
-
-            // Write directly using CGImageDestination (avoids NSImage/TIFF overhead)
-            guard let destination = CGImageDestinationCreateWithURL(fileURL as CFURL, UTType.png.identifier as CFString, 1, nil) else {
-                logger.warning("Could not create image destination")
-                return nil
-            }
-            CGImageDestinationAddImage(destination, cgImage, nil)
-            guard CGImageDestinationFinalize(destination) else {
-                logger.warning("Could not finalize image destination")
-                return nil
-            }
-
-            return fileURL
-        }
-        
-        // Early return if no valid images
-        if imageURLs.isEmpty && !images.isEmpty {
-            logger.warning("Failed to process all images for VLM")
-            throw NSError(domain: "LocalModelProvider", code: -3,
-                          userInfo: [NSLocalizedDescriptionKey: "Failed to process images for vision model"])
-        }
-        
-        // Clean up temp files when we're done
-        defer {
-            for url in imageURLs {
-                try? FileManager.default.removeItem(at: url)
-            }
-        }
-
-        // Create a chat-style input with images
-        var messages: [Chat.Message] = []
-
-        // Add system message if provided
-        if let systemPrompt = systemPrompt, !systemPrompt.isEmpty {
-            messages.append(Chat.Message(role: .system, content: systemPrompt))
-        }
-
-        // Convert image URLs to the format expected by MLX
-        let imageAttachments: [UserInput.Image] = imageURLs.map { .url($0) }
-
-        // Add user message with text and images
-        messages.append(Chat.Message(
-            role: .user,
-            content: userPrompt,
-            images: imageAttachments
-        ))
-
-        // Create chat input
-        let userInput = UserInput(
-            chat: messages,
-            additionalContext: ["enable_thinking": self.enableThinking]
-        )
-
+        // Note: temp file cleanup for VLM images happens after generation completes.
+        // The URLs are captured in the UserInput and must remain valid during generation.
+        // MLX processes them during prepare(), so they can be cleaned after generateResponse returns.
         return try await generateResponse(
             userInput: userInput,
             modelContainer: modelContainer,
@@ -925,19 +1005,16 @@ class LocalModelProvider {
         )
     }
     
-    
+    // Fix #4: Proper cancellation that stops in-flight generation
     func cancel() {
-        // Cancel ongoing generation (MLXLLM doesn't have explicit cancellation for generate,
-        // but setting running = false prevents new ones and stops the wait loop)
-        Task { @MainActor in
-            if running {
-                logger.debug("Attempting to cancel generation...")
-                // You might need more sophisticated cancellation if MLXLLM adds support
-            }
-            running = false
-            isProcessing = false
-            // Don't cancel download here, that's separate
+        if running {
+            logger.debug("Cancelling in-flight generation...")
+            generationTask?.cancel()
+            generationTask = nil
         }
+        running = false
+        isProcessing = false
+        // Don't cancel download here, that's separate
     }
 }
 

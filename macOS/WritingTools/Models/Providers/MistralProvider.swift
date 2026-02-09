@@ -123,6 +123,58 @@ final class MistralProvider: AIProvider {
         return try await task.value
     }
     
+    func processTextStreaming(
+        systemPrompt: String?,
+        userPrompt: String,
+        images: [Data],
+        onChunk: @escaping @MainActor (String) -> Void
+    ) async throws {
+        isProcessing = true
+        defer { isProcessing = false }
+
+        guard !config.apiKey.isEmpty else {
+            throw NSError(domain: "MistralAPI", code: -1,
+                          userInfo: [NSLocalizedDescriptionKey: "API key is missing."])
+        }
+
+        let mistralService = AIProxy.mistralDirectService(unprotectedAPIKey: config.apiKey)
+
+        var messages: [MistralChatCompletionRequestBody.Message] = []
+        if let systemPrompt = systemPrompt {
+            messages.append(.system(content: systemPrompt))
+        }
+
+        var combinedPrompt = userPrompt
+        if !images.isEmpty {
+            let ocrText = await OCRManager.shared.extractText(from: images)
+            if !ocrText.isEmpty {
+                combinedPrompt += "\nExtracted Text: \(ocrText)"
+            }
+        }
+        messages.append(.user(content: combinedPrompt))
+
+        do {
+            let stream = try await mistralService.streamingChatCompletionRequest(body: .init(
+                messages: messages,
+                model: config.model
+            ), secondsToWait: 60)
+
+            for try await chunk in stream {
+                if Task.isCancelled { break }
+                if let content = chunk.choices.first?.delta.content {
+                    onChunk(content)
+                }
+            }
+        } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
+            logger.error("Mistral streaming error (\(statusCode)): \(responseBody)")
+            throw NSError(domain: "MistralAPI", code: statusCode,
+                          userInfo: [NSLocalizedDescriptionKey: "API error: \(responseBody)"])
+        } catch {
+            logger.error("Mistral streaming failed: \(error.localizedDescription)")
+            throw error
+        }
+    }
+
     func cancel() {
         currentTask?.cancel()
         currentTask = nil

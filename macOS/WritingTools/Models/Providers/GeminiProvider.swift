@@ -113,6 +113,63 @@ final class GeminiProvider: AIProvider {
         return try await task.value
     }
     
+    func processTextStreaming(
+        systemPrompt: String?,
+        userPrompt: String,
+        images: [Data],
+        onChunk: @escaping @MainActor (String) -> Void
+    ) async throws {
+        isProcessing = true
+        defer { isProcessing = false }
+
+        guard !config.apiKey.isEmpty else {
+            throw NSError(domain: "GeminiAPI", code: -1,
+                          userInfo: [NSLocalizedDescriptionKey: "API key is missing."])
+        }
+
+        let geminiService = AIProxy.geminiDirectService(unprotectedAPIKey: config.apiKey)
+        let finalPrompt = systemPrompt.map { "\($0)\n\n\(userPrompt)" } ?? userPrompt
+
+        var parts: [GeminiGenerateContentRequestBody.Content.Part] = [.text(finalPrompt)]
+        for imageData in images {
+            parts.append(.inline(data: imageData, mimeType: "image/jpeg"))
+        }
+
+        let requestBody = GeminiGenerateContentRequestBody(
+            contents: [.init(parts: parts)],
+            safetySettings: [
+                .init(category: .dangerousContent, threshold: .none),
+                .init(category: .harassment, threshold: .none),
+                .init(category: .hateSpeech, threshold: .none),
+                .init(category: .sexuallyExplicit, threshold: .none),
+                .init(category: .civicIntegrity, threshold: .none)
+            ]
+        )
+
+        do {
+            let stream = try await geminiService.generateStreamingContentRequest(
+                body: requestBody,
+                model: config.modelName,
+                secondsToWait: 60
+            )
+            for try await chunk in stream {
+                if Task.isCancelled { break }
+                for part in chunk.candidates?.first?.content?.parts ?? [] {
+                    if case .text(let text) = part {
+                        onChunk(text)
+                    }
+                }
+            }
+        } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
+            logger.error("Gemini streaming error (\(statusCode)): \(responseBody)")
+            throw NSError(domain: "GeminiAPI", code: statusCode,
+                          userInfo: [NSLocalizedDescriptionKey: "API error: \(responseBody)"])
+        } catch {
+            logger.error("Gemini streaming failed: \(error.localizedDescription)")
+            throw error
+        }
+    }
+
     func cancel() {
         currentTask?.cancel()
         currentTask = nil
