@@ -10,33 +10,7 @@ struct CommandButton: View {
     
     var body: some View {
         ZStack {
-            
-            // Overlay edit controls when in edit mode
-            if isEditing {
-                HStack {
-                    Button(action: onDelete) {
-                        Image(systemName: "trash.fill")
-                            .frame(width: 10, height: 16)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.red)
-                    .accessibilityLabel("Delete \(command.name)")
-                    .accessibilityHint("Removes this command")
-                    
-                    Spacer()
-                    
-                    Button(action: onEdit) {
-                        Image(systemName: "pencil")
-                            .frame(width: 10, height: 16)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .accessibilityLabel("Edit \(command.name)")
-                    .accessibilityHint("Edit this command's details")
-                }
-                .padding(.horizontal, 4)
-            }
-            
-            // Main button wrapper
+            // Main button / label
             Button(action: {
                 if !isEditing && !isLoading {
                     onTap()
@@ -53,13 +27,40 @@ struct CommandButton: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(LoadingButtonStyle(isLoading: isLoading))
-            .opacity(isEditing ? 0 : 1)
+            .opacity(isEditing ? 0.4 : 1)
             .disabled(isLoading || isEditing)
             .accessibilityLabel(command.name)
             .accessibilityHint(isLoading ? "Processing" : "Apply \(command.name) to selected text")
             .accessibilityAddTraits(isLoading ? .updatesFrequently : [])
             
-            
+            // Overlay edit controls when in edit mode
+            if isEditing {
+                HStack {
+                    Button(action: onDelete) {
+                        Image(systemName: "trash.fill")
+                            .font(.caption)
+                            .frame(width: 8, height: 16)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.red)
+                    .controlSize(.small)
+                    .accessibilityLabel("Delete \(command.name)")
+                    .accessibilityHint("Removes this command")
+                    
+                    Spacer()
+                    
+                    Button(action: onEdit) {
+                        Image(systemName: "pencil")
+                            .font(.caption)
+                            .frame(width: 8, height: 16)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                    .accessibilityLabel("Edit \(command.name)")
+                    .accessibilityHint("Edit this command's details")
+                }
+                .padding(.horizontal, 6)
+            }
         }
         .commandButtonBackground()
     }
