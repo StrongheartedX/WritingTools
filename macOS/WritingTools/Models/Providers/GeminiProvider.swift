@@ -13,8 +13,8 @@ enum GeminiModel: String, CaseIterable {
     case gemmabig = "gemma-3-27b-it"
     case gemmasmall = "gemma-3-4b-it"
     case flashlite = "gemini-flash-lite-latest"
-    case flash = "gemini-flash-latest"
-    case pro = "gemini-3-pro-latest"
+    case flash = "gemini-3-flash-preview"
+    case pro = "gemini-3.1-pro-preview"
     case custom = "custom"
     
     var displayName: String {
@@ -22,8 +22,8 @@ enum GeminiModel: String, CaseIterable {
         case .gemmabig: return "Gemma 3 27b (Very Intelligent | unlimited)"
         case .gemmasmall: return "Gemma 3 4b (Intelligent | unlimited)"
         case .flashlite: return "Gemini Flash Lite Latest (Intelligent | ~20 uses/min)"
-        case .flash: return "Gemini Flash Latest (Very Intelligent | ~20 uses/min)"
-        case .pro: return "Gemini Pro latest (Peak Intelligence | ~5 uses/min)"
+        case .flash: return "Gemini Flash 3 (Very Intelligent | ~20 uses/min)"
+        case .pro: return "Gemini Pro 3.1 (Peak Intelligence | ~5 uses/min)"
         case .custom: return "Custom"
         }
     }
