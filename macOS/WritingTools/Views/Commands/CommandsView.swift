@@ -29,6 +29,8 @@ struct CommandsView: View {
                 }
                 .buttonStyle(.plain)
                 .help("Close")
+                .accessibilityLabel("Close commands manager")
+                .accessibilityHint("Dismiss the commands window")
             }
             .padding()
             
@@ -82,7 +84,7 @@ struct CommandsView: View {
                 Spacer()
             }
         }
-        .frame(width: 600, height: 500)
+        .frame(minWidth: 520, idealWidth: 600, maxWidth: 840, minHeight: 420, idealHeight: 500, maxHeight: 820)
         .windowBackground(useGradient: settings.useGradientTheme)
         .sheet(isPresented: $isAddingNew) {
             CommandEditor(
@@ -95,30 +97,18 @@ struct CommandsView: View {
                 onCancel: {
                     newCommand = CommandModel(name: "", prompt: "", icon: "text.bubble")
                     isAddingNew = false
-                }
-            )
-        }
-        .sheet(item: $editingCommand) { command in
-            // Make a copy for editing
-            let commandCopy = command
-            let binding = Binding(
-                get: { commandCopy },
-                set: { updatedCommand in
-                    // When saving, update the command in the manager
-                    commandManager.updateCommand(updatedCommand)
-                    editingCommand = nil
-                }
-            )
-            
-            CommandEditor(
-                command: binding,
-                onSave: {
-                    // The binding's setter will handle the update
-                },
-                onCancel: {
-                    editingCommand = nil
                 },
                 commandManager: commandManager
+            )
+            // Force SwiftUI to recreate CommandEditor each time the sheet opens,
+            // preventing stale @State values from a previous session.
+            .id(newCommand.id)
+        }
+        .sheet(item: $editingCommand) { command in
+            EditCommandSheet(
+                original: command,
+                commandManager: commandManager,
+                onDismiss: { editingCommand = nil }
             )
         }
         .alert("Reset Built-in Commands", isPresented: $showingResetAlert) {
@@ -207,6 +197,7 @@ struct CommandRow: View {
     let onDelete: (CommandModel) -> Void
     
     @Environment(\.colorScheme) var colorScheme
+    @State private var showDeleteConfirmation = false
     
     var body: some View {
         HStack(spacing: 16) {
@@ -250,8 +241,10 @@ struct CommandRow: View {
                 }
                 .buttonStyle(.plain)
                 .help("Edit command")
+                .accessibilityLabel("Edit \(command.name)")
+                .accessibilityHint("Open editor for this command")
                 
-                Button(action: { onDelete(command) }) {
+                Button(action: { showDeleteConfirmation = true }) {
                     Image(systemName: "trash")
                         .font(.body)
                         .foregroundStyle(.red)
@@ -261,10 +254,51 @@ struct CommandRow: View {
                 }
                 .buttonStyle(.plain)
                 .help("Delete command")
+                .accessibilityLabel("Delete \(command.name)")
+                .accessibilityHint("Remove this command")
             }
         }
         .padding(.vertical, 8)
         .contentShape(Rectangle())
+        .alert("Delete Command", isPresented: $showDeleteConfirmation) {
+            Button("Cancel", role: .cancel) {}
+            Button("Delete", role: .destructive) {
+                onDelete(command)
+            }
+        } message: {
+            Text("Are you sure you want to delete \"\(command.name)\"? This action cannot be undone.")
+        }
+    }
+}
+
+/// Wrapper view that owns a mutable @State copy of the command being edited,
+/// so the Binding round-trip works correctly inside CommandEditor.
+private struct EditCommandSheet: View {
+    let original: CommandModel
+    let commandManager: CommandManager
+    let onDismiss: () -> Void
+
+    @State private var commandCopy: CommandModel
+
+    init(original: CommandModel, commandManager: CommandManager, onDismiss: @escaping () -> Void) {
+        self.original = original
+        self.commandManager = commandManager
+        self.onDismiss = onDismiss
+        _commandCopy = State(initialValue: original)
+    }
+
+    var body: some View {
+        CommandEditor(
+            command: $commandCopy,
+            onSave: {
+                commandManager.updateCommand(commandCopy)
+                onDismiss()
+            },
+            onCancel: {
+                onDismiss()
+            },
+            commandManager: commandManager
+        )
     }
 }
 

@@ -4,6 +4,7 @@ import Observation
 
 private let logger = AppLogger.logger("PopupView")
 
+@MainActor
 @Observable
 final class PopupViewModel {
   var isEditMode: Bool = false
@@ -12,8 +13,8 @@ final class PopupViewModel {
 struct PopupView: View {
   @Bindable var appState: AppState
   @Bindable var viewModel: PopupViewModel
+  @Bindable private var settings = AppSettings.shared
   @Environment(\.colorScheme) var colorScheme
-  @AppStorage("use_gradient_theme") private var useGradientTheme = false
 
   @State private var customText: String = ""
   @State private var isCustomLoading: Bool = false
@@ -25,6 +26,12 @@ struct PopupView: View {
   // Error handling
   @State private var showingErrorAlert = false
   @State private var errorMessage = ""
+  
+  // Track in-flight custom instruction task to prevent races
+  @State private var customInstructionTask: Task<Void, Never>?
+  
+  // Focus management for accessibility
+  @FocusState private var isTextFieldFocused: Bool
 
   let closeAction: () -> Void
 
@@ -54,6 +61,8 @@ struct PopupView: View {
         }
         .buttonStyle(.plain)
         .help(viewModel.isEditMode ? "Exit Edit Mode" : "Close")
+        .accessibilityLabel(viewModel.isEditMode ? "Exit edit mode" : "Close popup")
+        .accessibilityHint(viewModel.isEditMode ? "Return to command list" : "Dismiss the popup")
         .padding(.top, 8)
         .padding(.leading, 8)
 
@@ -61,10 +70,7 @@ struct PopupView: View {
 
         Button(action: {
           viewModel.isEditMode.toggle()
-          NotificationCenter.default.post(
-            name: NSNotification.Name("EditModeChanged"),
-            object: nil
-          )
+          // Note: PopupWindow observes viewModel.isEditMode directly via @Observable
         }) {
           Image(
             systemName: viewModel.isEditMode ? "checkmark" : "square.and.pencil"
@@ -77,6 +83,8 @@ struct PopupView: View {
         }
         .buttonStyle(.plain)
         .help(viewModel.isEditMode ? "Save Changes" : "Edit Commands")
+        .accessibilityLabel(viewModel.isEditMode ? "Save changes" : "Edit commands")
+        .accessibilityHint(viewModel.isEditMode ? "Exit edit mode" : "Edit command list")
         .padding(.top, 8)
         .padding(.trailing, 8)
       }
@@ -85,49 +93,32 @@ struct PopupView: View {
       if !viewModel.isEditMode {
         HStack(spacing: 8) {
           TextField(
-            appState.selectedText.isEmpty
-              ? "Describe your change..."
-              : "Describe your change...",
+            "Describe your change...",
             text: $customText
           )
           .textFieldStyle(.plain)
+          .focused($isTextFieldFocused)
           .appleStyleTextField(
             text: customText,
             isLoading: isCustomLoading,
             onSubmit: processCustomChange
           )
+          .accessibilityLabel("Custom instruction")
+          .accessibilityHint("Describe how to modify the selected text")
         }
         .padding(.horizontal)
+        .onAppear {
+          // Auto-focus the text field when popup appears for better keyboard accessibility
+          Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(100))
+            isTextFieldFocused = true
+          }
+        }
       }
 
       if !appState.selectedText.isEmpty || !appState.selectedImages.isEmpty {
-        // Command buttons grid
-        ScrollView {
-          LazyVGrid(columns: columns, spacing: 8) {
-            ForEach(appState.commandManager.commands) { command in
-              CommandButton(
-                command: command,
-                isEditing: viewModel.isEditMode,
-                isLoading: processingCommandId == command.id,
-                onTap: {
-                  processingCommandId = command.id
-                  Task {
-                    await processCommandAndCloseWhenDone(command)
-                  }
-                },
-                onEdit: {
-                  editingCommand = command
-                },
-                onDelete: {
-                  logger.debug("Deleting command: \(command.name)")
-                  appState.commandManager.deleteCommand(command)
-                }
-              )
-            }
-          }
-          .padding(.horizontal, 8)
-        }
-        .padding(.horizontal, 8)
+        commandButtonsGrid
+          .padding(.horizontal, 16)
       }
 
       if viewModel.isEditMode {
@@ -146,12 +137,12 @@ struct PopupView: View {
       }
     }
     .padding(.bottom, 8)
-    .windowBackground(useGradient: useGradientTheme)
+    .windowBackground(useGradient: settings.useGradientTheme, cornerRadius: 20)
     .overlay(
-      RoundedRectangle(cornerRadius: 12)
+      RoundedRectangle(cornerRadius: 20)
         .strokeBorder(Color.gray.opacity(0.2), lineWidth: 1)
     )
-    .clipShape(.rect(cornerRadius: 12))
+    .clipShape(.rect(cornerRadius: 20))
     .shadow(color: Color.black.opacity(0.2), radius: 10, y: 5)
     // Sheet for editing individual command
     .sheet(item: $editingCommand) { command in
@@ -177,12 +168,22 @@ struct PopupView: View {
     // Sheet for managing all commands
     .sheet(isPresented: $showingCommandsView) {
       CommandsView(commandManager: appState.commandManager)
-        .onDisappear {
-          NotificationCenter.default.post(
-            name: NSNotification.Name("CommandsChanged"),
-            object: nil
-          )
-        }
+      // Note: PopupWindow observes commandManager.commands directly via @Observable
+    }
+    // Suppress popup auto-dismiss while a sheet is presenting or presented.
+    // This prevents a race where windowDidResignKey fires before the sheet
+    // is attached to the window.
+    .onChange(of: editingCommand) { _, newValue in
+      WindowManager.shared.setPopupDismissSuppressed(
+        newValue != nil,
+        reason: .commandEditorSheet
+      )
+    }
+    .onChange(of: showingCommandsView) { _, newValue in
+      WindowManager.shared.setPopupDismissSuppressed(
+        newValue,
+        reason: .commandsManagerSheet
+      )
     }
     .alert("Error", isPresented: $showingErrorAlert) {
       Button("OK", role: .cancel) {}
@@ -191,144 +192,186 @@ struct PopupView: View {
     }
   }
 
+  // MARK: - Command Buttons Grid
+
+  @ViewBuilder
+  private var commandButtonsGrid: some View {
+    let grid = LazyVGrid(columns: columns, spacing: 8) {
+      ForEach(appState.commandManager.commands) { command in
+        CommandButton(
+          command: command,
+          isEditing: viewModel.isEditMode,
+          isLoading: processingCommandId == command.id,
+          onTap: {
+            processingCommandId = command.id
+            Task {
+              await processCommandAndCloseWhenDone(command)
+            }
+          },
+          onEdit: {
+            editingCommand = command
+          },
+          onDelete: {
+            logger.debug("Deleting command: \(command.name)")
+            appState.commandManager.deleteCommand(command)
+          }
+        )
+      }
+    }
+
+    if #available(macOS 26, *) {
+      // GlassEffectContainer renders all glass effects in a single pass,
+      // ensuring consistent background adaptation across all buttons.
+      // spacing: 0 prevents shapes from blending into each other at rest.
+      GlassEffectContainer(spacing: 0) {
+        grid
+      }
+    } else {
+      grid
+    }
+  }
+
   // Process a command asynchronously and only close the popup when done
   private func processCommandAndCloseWhenDone(
     _ command: CommandModel
   ) async {
-    guard !appState.selectedText.isEmpty else {
-      processingCommandId = nil
-      return
-    }
-
-    appState.isProcessing = true
+    defer { processingCommandId = nil }
 
     do {
-      let systemPrompt = command.prompt
-      let userText = appState.selectedText
-
-      // Get the appropriate provider for this command (respects per-command overrides)
-      let provider = appState.getProvider(for: command)
-
-      let result = try await provider.processText(
-        systemPrompt: systemPrompt,
-        userPrompt: userText,
-        images: appState.selectedImages,
-        streaming: false
+      _ = try await CommandExecutionEngine.shared.executeCommand(
+        command,
+        source: .popup,
+        closePopupOnInlineCompletion: closeAction
       )
-
-      await MainActor.run {
-        if command.useResponseWindow {
-          let window = ResponseWindow(
-            title: command.name,
-            content: result,
-            selectedText: userText,
-            option: .proofread,
-            provider: provider
-          )
-
-          WindowManager.shared.addResponseWindow(window)
-          window.makeKeyAndOrderFront(nil)
-          window.orderFrontRegardless()
-        } else {
-          if command.preserveFormatting {
-            appState.replaceSelectedTextPreservingAttributes(with: result)
-          } else {
-            appState.replaceSelectedText(with: result)
-          }
-        }
-
-        closeAction()
-        processingCommandId = nil
-      }
+    } catch let error as CommandExecutionEngineError {
+      logger.error("Error processing command: \(error.localizedDescription)")
+      errorMessage = error.localizedDescription
+      showingErrorAlert = true
     } catch {
       logger.error("Error processing command: \(error.localizedDescription)")
-      await MainActor.run {
-        errorMessage = error.localizedDescription
-        showingErrorAlert = true
-        processingCommandId = nil
-      }
-    }
-
-    await MainActor.run {
-      appState.isProcessing = false
+      errorMessage = error.localizedDescription
+      showingErrorAlert = true
     }
   }
 
   private func processCustomChange() {
-    guard !customText.isEmpty else { return }
+    let instruction = customText.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !instruction.isEmpty else { return }
+    // Cancel any in-flight custom instruction to prevent racing tasks
+    customInstructionTask?.cancel()
     isCustomLoading = true
-    processCustomInstruction(customText)
+    customInstructionTask = Task {
+      await processCustomInstruction(instruction)
+    }
   }
 
-  private func processCustomInstruction(_ instruction: String) {
-    guard !instruction.isEmpty else { return }
-    appState.isProcessing = true
+  private func processCustomInstruction(_ instruction: String) async {
+    defer { isCustomLoading = false }
 
-    // Capture setting value once at the start
-    let openInResponseWindow = AppSettings.shared.openCustomCommandsInResponseWindow
-
-    Task {
-      do {
-        let systemPrompt = """
-        You are a writing and coding assistant. Your sole task is to respond \
-        to the user's instruction thoughtfully and comprehensively.
-        If the instruction is a question, provide a detailed answer. But \
-        always return the best and most accurate answer and not different \
-        options.
-        If it's a request for help, provide clear guidance and examples where \
-        appropriate. Make sure to use the language used or specified by the \
-        user instruction.
-        Use Markdown formatting to make your response more readable.
-        """
-
-        let userPrompt = appState.selectedText.isEmpty
-          ? instruction
-          : """
-            User's instruction: \(instruction)
-
-            Text:
-            \(appState.selectedText)
-            """
-
-        let result = try await appState.activeProvider.processText(
-          systemPrompt: systemPrompt,
-          userPrompt: userPrompt,
-          images: appState.selectedImages,
-          streaming: false
-        )
-
-        await MainActor.run {
-          if openInResponseWindow {
-            let window = ResponseWindow(
-              title: "AI Response",
-              content: result,
-              selectedText: appState.selectedText.isEmpty
-                ? instruction : appState.selectedText,
-              option: .proofread,
-              provider: appState.activeProvider
-            )
-
-            WindowManager.shared.addResponseWindow(window)
-            window.makeKeyAndOrderFront(nil)
-            window.orderFrontRegardless()
-          } else {
-            appState.replaceSelectedText(with: result)
-          }
-
-          customText = ""
-          isCustomLoading = false
-          closeAction()
-        }
-      } catch {
-        logger.error("Error processing text: \(error.localizedDescription)")
-        await MainActor.run {
-          errorMessage = error.localizedDescription
-          showingErrorAlert = true
-          isCustomLoading = false
-        }
+    do {
+      let outcome = try await CommandExecutionEngine.shared.executeCustomInstruction(
+        instruction,
+        source: .popup,
+        openInResponseWindow: AppSettings.shared.openCustomCommandsInResponseWindow,
+        closePopupOnInlineCompletion: closeAction
+      )
+      if outcome != .skippedBecauseBusy {
+        customText = ""
       }
-
-      appState.isProcessing = false
+    } catch let error as CommandExecutionEngineError {
+      logger.error("Error processing text: \(error.localizedDescription)")
+      errorMessage = error.localizedDescription
+      showingErrorAlert = true
+    } catch {
+      logger.error("Error processing text: \(error.localizedDescription)")
+      errorMessage = error.localizedDescription
+      showingErrorAlert = true
     }
   }
 }
+// MARK: - Preview
+
+#Preview("Popup View - Default") {
+  @Previewable @State var appState = {
+    let state = AppState.shared
+    state.selectedText = """
+      This is some sample text that has been selected by the user. \
+      It could be a paragraph from a document, an email, or any other text \
+      that needs to be processed by the AI writing tools.
+      """
+    return state
+  }()
+  
+  @Previewable @State var viewModel = PopupViewModel()
+  
+  PopupView(
+    appState: appState,
+    viewModel: viewModel,
+    closeAction: {
+      print("Close action triggered")
+    }
+  )
+  .frame(width: 400, height: 500)
+}
+/*
+#Preview("Popup View - Edit Mode") {
+  @Previewable @State var appState = {
+    let state = AppState.shared
+    state.selectedText = "Sample text for editing commands."
+    return state
+  }()
+  
+  @Previewable @State var viewModel = {
+    let vm = PopupViewModel()
+    vm.isEditMode = true
+    return vm
+  }()
+  
+  PopupView(
+    appState: appState,
+    viewModel: viewModel,
+    closeAction: {
+      print("Close action triggered")
+    }
+  )
+  .frame(width: 400, height: 500)
+}
+
+#Preview("Popup View - No Selection") {
+  @Previewable @State var appState = AppState.shared
+  @Previewable @State var viewModel = PopupViewModel()
+  
+  PopupView(
+    appState: appState,
+    viewModel: viewModel,
+    closeAction: {
+      print("Close action triggered")
+    }
+  )
+  .frame(width: 400, height: 500)
+}
+
+#Preview("Popup View - With Images") {
+  @Previewable @State var appState = {
+    let state = AppState.shared
+    state.selectedText = "Analyze this image and text together."
+    // Mock image data
+    if let mockImage = NSImage(systemSymbolName: "photo", accessibilityDescription: nil),
+       let tiffData = mockImage.tiffRepresentation {
+      state.selectedImages = [tiffData]
+    }
+    return state
+  }()
+  
+  @Previewable @State var viewModel = PopupViewModel()
+  
+  PopupView(
+    appState: appState,
+    viewModel: viewModel,
+    closeAction: {
+      print("Close action triggered")
+    }
+  )
+  .frame(width: 400, height: 500)
+}
+*/

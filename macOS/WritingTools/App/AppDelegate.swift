@@ -1,48 +1,23 @@
 import SwiftUI
 import KeyboardShortcuts
 import Carbon.HIToolbox
-import UniformTypeIdentifiers
-import ImageIO
 
 private let logger = AppLogger.logger("AppDelegate")
 
+/// AppDelegate handles keyboard shortcuts, services, and popup window management.
+/// Menu bar UI is handled by SwiftUI's MenuBarExtra in writing_toolsApp.swift.
 @MainActor
 class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
-    // Static status item to prevent deallocation
-    private static var sharedStatusItem: NSStatusItem?
-
-    // Property to track service-triggered popups
-    private var isServiceTriggered: Bool = false
-
-    // Computed property to manage the menu bar status item
-    var statusBarItem: NSStatusItem! {
-        get {
-            if AppDelegate.sharedStatusItem == nil {
-                AppDelegate.sharedStatusItem =
-                    NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-                configureStatusBarItem()
-            }
-            return AppDelegate.sharedStatusItem
-        }
-        set {
-            AppDelegate.sharedStatusItem = newValue
-        }
-    }
-
+    private var iCloudSyncObserver: NSObjectProtocol?
+    private var iCloudQuotaObserver: NSObjectProtocol?
+    private var clipboardRestoreObserver: NSObjectProtocol?
+    private var commandsChangedObserver: NSObjectProtocol?
+    private var commandShortcutNamesById: [UUID: KeyboardShortcuts.Name] = [:]
+    
     let appState = AppState.shared
-    private var settingsWindow: NSWindow?
-    private var aboutWindow: NSWindow?
-    private var settingsHostingView: NSHostingView<SettingsView>?
-    private var aboutHostingView: NSHostingView<AboutView>?
-
-    // Pasteboard monitoring
-    private var pasteboardObserver: NSObjectProtocol?
-    @objc private func toggleHotkeys() {
-        AppSettings.shared.hotkeysPaused.toggle()
-        setupMenuBar()
-    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApp.setActivationPolicy(.accessory)
         NSApp.servicesProvider = self
 
         if CommandLine.arguments.contains("--reset") {
@@ -52,15 +27,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             return
         }
 
-        Task { @MainActor [weak self] in
-            self?.setupMenuBar()
-
-            if self?.statusBarItem == nil {
-                self?.recreateStatusBarItem()
-            }
-
-            if !UserDefaults.standard.bool(forKey: "has_completed_onboarding") {
-                self?.showOnboarding()
+        Task { @MainActor in
+            if !AppSettings.shared.hasCompletedOnboarding {
+                self.showOnboarding()
             }
         }
 
@@ -77,309 +46,152 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         setupCommandShortcuts()
 
         // Register for command changes to update shortcuts
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(setupCommandShortcuts),
-            name: NSNotification.Name("CommandsChanged"),
-            object: nil
-        )
-    }
-
-    @objc private func setupCommandShortcuts() {
-        for command in appState.commandManager.commands.filter({ !$0.hasShortcut }) {
-            KeyboardShortcuts.reset(.commandShortcut(for: command.id))
+        commandsChangedObserver = NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("CommandsChanged"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.setupCommandShortcuts()
+            }
         }
 
-        for command in appState.commandManager.commands.filter({ $0.hasShortcut }) {
-            KeyboardShortcuts.onKeyUp(for: .commandShortcut(for: command.id)) {
-                [weak self] in
-                guard let self = self, !AppSettings.shared.hotkeysPaused else {
+        configureCloudCommandSync(enabled: AppSettings.shared.enableICloudCommandSync)
+        iCloudSyncObserver = NotificationCenter.default.addObserver(
+            forName: .iCloudCommandSyncPreferenceDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.configureCloudCommandSync(enabled: AppSettings.shared.enableICloudCommandSync)
+            }
+        }
+
+        iCloudQuotaObserver = NotificationCenter.default.addObserver(
+            forName: .iCloudCommandSyncQuotaExceeded,
+            object: nil,
+            queue: .main
+        ) { [weak self] note in
+            Task { @MainActor in
+                guard let self else { return }
+                let payloadBytes = note.userInfo?[CloudCommandsSyncUserInfoKey.payloadBytes] as? Int
+                let totalBytes = note.userInfo?[CloudCommandsSyncUserInfoKey.totalBytes] as? Int
+                let reason = note.userInfo?[CloudCommandsSyncUserInfoKey.reason] as? String
+                self.showICloudQuotaWarningAlert(
+                    payloadBytes: payloadBytes,
+                    totalBytes: totalBytes,
+                    reason: reason
+                )
+            }
+        }
+
+        clipboardRestoreObserver = NotificationCenter.default.addObserver(
+            forName: .clipboardRestoreSkipped,
+            object: nil,
+            queue: .main
+        ) { [weak self] note in
+            Task { @MainActor in
+                guard let self else { return }
+                let expected = note.userInfo?[ClipboardNotificationUserInfoKey.expectedChangeCount] as? Int ?? -1
+                let actual = note.userInfo?[ClipboardNotificationUserInfoKey.actualChangeCount] as? Int ?? -1
+                self.showClipboardRestoreSkippedWarningAlert(
+                    expectedChangeCount: expected,
+                    actualChangeCount: actual
+                )
+            }
+        }
+    }
+
+    private func setupCommandShortcuts() {
+        let commandsWithShortcuts = appState.commandManager.commands.filter(\.hasShortcut)
+        let desiredIds = Set(commandsWithShortcuts.map(\.id))
+        let registeredIds = Set(commandShortcutNamesById.keys)
+
+        guard desiredIds != registeredIds else { return }
+
+        let removedIds = registeredIds.subtracting(desiredIds)
+        for id in removedIds {
+            guard let shortcutName = commandShortcutNamesById[id] else { continue }
+            KeyboardShortcuts.removeHandler(for: shortcutName)
+            KeyboardShortcuts.reset(shortcutName)
+            commandShortcutNamesById[id] = nil
+        }
+
+        let addedIds = desiredIds.subtracting(registeredIds)
+        for commandId in addedIds {
+            let shortcutName = KeyboardShortcuts.Name.commandShortcut(for: commandId)
+            KeyboardShortcuts.removeHandler(for: shortcutName)
+            KeyboardShortcuts.onKeyUp(for: shortcutName) { [weak self] in
+                guard let self, !AppSettings.shared.hotkeysPaused else { return }
+                guard let command = self.appState.commandManager.commands.first(where: { $0.id == commandId }) else {
+                    logger.warning("Shortcut fired for missing command ID: \(commandId.uuidString)")
                     return
                 }
                 self.executeCommandDirectly(command)
             }
+            commandShortcutNamesById[commandId] = shortcutName
         }
     }
 
     private func executeCommandDirectly(_ command: CommandModel) {
-        appState.activeProvider.cancel()
+        Task { @MainActor [weak self] in
+            guard let self else { return }
 
-        Task { @MainActor in
-            // Store the previous app BEFORE any operations
-            let previousApp = NSWorkspace.shared.frontmostApplication
-
-            let pb = NSPasteboard.general
-            let oldChangeCount = pb.changeCount
-
-            // IMPORTANT: Capture the ENTIRE clipboard state before copying
-            let clipboardSnapshot = pb.createSnapshot()
-            logger.debug("Captured clipboard snapshot with \(clipboardSnapshot.itemCount) items")
-
-            // Create and post Cmd+C event
-            let src = CGEventSource(stateID: .hidSystemState)
-            let kd = CGEvent(keyboardEventSource: src, virtualKey: 0x08, keyDown: true)
-            let ku = CGEvent(keyboardEventSource: src, virtualKey: 0x08, keyDown: false)
-            kd?.flags = .maskCommand
-            ku?.flags = .maskCommand
-
-            kd?.post(tap: .cgSessionEventTap)
-            ku?.post(tap: .cgSessionEventTap)
-
-            // Give the system a tiny moment to process the copy event
-            try? await Task.sleep(for: .milliseconds(50)) // 50ms - increased for reliability
-
-            // Wait for the pasteboard to actually change
-            await waitForPasteboardChange(pb, initialChangeCount: oldChangeCount)
-
-            // Only proceed if the pasteboard actually changed (new content was copied)
-            guard pb.changeCount > oldChangeCount else {
-                logger.warning("No new content was copied for command: \(command.name) - change count didn't increase (old: \(oldChangeCount), new: \(pb.changeCount))")
-                return
-            }
-
-            // Read the newly copied content IMMEDIATELY after detecting the change
-            var foundImages: [Data] = []
-
-            let classes = [NSURL.self]
-            let imageTypeIdentifiers = [
-                UTType.image,
-                UTType.png,
-                UTType.jpeg,
-                UTType.tiff,
-                UTType.gif,
-            ].map(\.identifier)
-
-            let options: [NSPasteboard.ReadingOptionKey: Any] = [
-                .urlReadingFileURLsOnly: true,
-                .urlReadingContentsConformToTypes: imageTypeIdentifiers,
-            ]
-
-            if let urls = pb.readObjects(forClasses: classes, options: options) as? [URL] {
-                let loadedImages = await loadImageData(from: urls)
-                if !loadedImages.isEmpty {
-                    foundImages.append(contentsOf: loadedImages)
-                }
-            }
-
-            if foundImages.isEmpty {
-                let supportedImageTypes: [NSPasteboard.PasteboardType] = [
-                    NSPasteboard.PasteboardType(UTType.png.identifier),
-                    NSPasteboard.PasteboardType(UTType.jpeg.identifier),
-                    NSPasteboard.PasteboardType(UTType.tiff.identifier),
-                    NSPasteboard.PasteboardType(UTType.gif.identifier),
-                    NSPasteboard.PasteboardType(UTType.image.identifier),
-                ]
-
-                for type in supportedImageTypes {
-                    if let data = pb.data(forType: type) {
-                        foundImages.append(data)
-                        logger.debug("Found direct image data of type: \(type.rawValue)")
-                        break
-                    }
-                }
-            }
-
-            // Read rich text BEFORE clearing
-            let rich = pb.readAttributedSelection()
-            let selectedText = rich?.string ?? pb.string(forType: .string) ?? ""
-
-            guard !selectedText.isEmpty else {
-                logger.info("No text selected for command: \(command.name) - pasteboard contained no text")
-                // Restore original clipboard using snapshot
-                pb.restore(snapshot: clipboardSnapshot)
-                return
-            }
-
-            logger.debug("Successfully captured text for command \(command.name) (length: \(selectedText.count) characters)")
-
-            // Store data in appState BEFORE restoring clipboard
-            self.appState.selectedImages = foundImages
-            self.appState.selectedAttributedText = rich
-            self.appState.selectedText = selectedText
-
-            // Set previous app AFTER we've successfully copied
-            if let previousApp = previousApp {
-                self.appState.previousApplication = previousApp
-            }
-
-            // NOW restore original clipboard using the snapshot
-            pb.restore(snapshot: clipboardSnapshot)
-            logger.debug("Restored original clipboard after capturing selection")
-
-            // Process the command with the captured data
-            await self.processCommandWithUI(command)
-        }
-    }
-
-    private func processCommandWithUI(_ command: CommandModel) async {
-        if appState.isProcessing {
-            return
-        }
-
-        appState.isProcessing = true
-
-        defer {
-            appState.isProcessing = false
-        }
-
-        do {
-            // Get the appropriate provider for this command (respects per-command overrides)
-            let provider = appState.getProvider(for: command)
-
-            var result = try await provider.processText(
-                systemPrompt: command.prompt,
-                userPrompt: appState.selectedText,
-                images: appState.selectedImages,
-                streaming: false
-            )
-
-            // Preserve trailing newlines from the original selection
-            // This is important for triple-click selections which include the trailing newline
-            let originalText = appState.selectedText
-            if originalText.hasSuffix("\n") && !result.hasSuffix("\n") {
-                result += "\n"
-                logger.debug("Added trailing newline to match input")
-            }
-
-            await MainActor.run {
-                if command.useResponseWindow {
-                    let window = ResponseWindow(
-                        title: command.name,
-                        content: result,
-                        selectedText: appState.selectedText,
-                        option: nil,
-                        provider: provider
-                    )
-
-                    NSApp.activate(ignoringOtherApps: true)
-                    WindowManager.shared.addResponseWindow(window)
-                    window.makeKeyAndOrderFront(nil)
-                    window.orderFrontRegardless()
-                } else {
-                    if command.preserveFormatting, appState.selectedAttributedText != nil {
-                        appState.replaceSelectedTextPreservingAttributes(with: result)
-                    } else {
-                        appState.replaceSelectedText(with: result)
-                    }
-                }
-            }
-        } catch {
-            logger.error("Error processing command \(command.name): \(error.localizedDescription)")
-
-            // Show error alert
-            await MainActor.run {
-                let alert = NSAlert()
-                alert.messageText = "Command Error"
-                alert.informativeText = "Failed to process '\(command.name)': \(error.localizedDescription)"
-                alert.alertStyle = .warning
-                alert.addButton(withTitle: "OK")
-                alert.runModal()
-            }
-        }
-    }
-
-    // MARK: - Fixed: Clipboard Monitoring (Replace polling)
-
-    private func waitForPasteboardChange(_ pb: NSPasteboard, initialChangeCount: Int) async {
-        let startTime = Date()
-        let timeout: TimeInterval = 2.0 // Increased timeout
-        let pollInterval: Duration = .milliseconds(5)
-
-        while pb.changeCount == initialChangeCount && Date().timeIntervalSince(startTime) < timeout {
             do {
-                try await Task.sleep(for: pollInterval)
+                _ = try await CommandExecutionEngine.shared.executeCommand(
+                    command,
+                    source: .hotkey
+                )
+            } catch let error as CommandExecutionEngineError {
+                self.handleCommandExecutionError(error)
             } catch {
-                // Task was cancelled
-                logger.debug("Clipboard monitoring cancelled: \(error.localizedDescription)")
-                return
+                logger.error("Error processing command \(command.name): \(error.localizedDescription)")
+                await self.presentCommandErrorAlert(commandName: command.name, error: error)
             }
         }
+    }
 
-        if pb.changeCount == initialChangeCount {
-            logger.warning("Clipboard update timeout after \(timeout)s - no change detected")
-        } else {
-            let elapsed = Date().timeIntervalSince(startTime)
-            let formattedElapsed = elapsed.formatted(.number.precision(.fractionLength(3)))
-            logger.debug("Clipboard changed after \(formattedElapsed)s")
-        }
+    func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
+        true
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        if let observer = pasteboardObserver {
-            NotificationCenter.default.removeObserver(observer)
-            pasteboardObserver = nil
+        // Flush any debounced keychain writes before exit
+        AppSettings.shared.flushPendingKeychainWrites()
+
+        // Flush cloud sync: cancel debounce, push immediately, and synchronize
+        CloudCommandsSync.shared.flushAndSynchronize()
+
+        NotificationCenter.default.removeObserver(
+            self,
+            name: NSNotification.Name("CommandsChanged"),
+            object: nil
+        )
+        if let iCloudSyncObserver {
+            NotificationCenter.default.removeObserver(iCloudSyncObserver)
+            self.iCloudSyncObserver = nil
         }
-        WindowManager.shared.cleanupWindows()
-    }
-
-    private func recreateStatusBarItem() {
-        AppDelegate.sharedStatusItem = nil
-        _ = self.statusBarItem
-    }
-
-    private func configureStatusBarItem() {
-        guard let button = statusBarItem?.button else { return }
-        button.image = NSImage(
-            systemSymbolName: "pencil.circle",
-            accessibilityDescription: "Writing Tools"
-        )
-    }
-
-    private func setupMenuBar() {
-        guard let statusBarItem = self.statusBarItem else {
-            logger.error("Failed to create status bar item")
-            return
+        if let iCloudQuotaObserver {
+            NotificationCenter.default.removeObserver(iCloudQuotaObserver)
+            self.iCloudQuotaObserver = nil
         }
-
-        let menu = NSMenu()
-        menu.addItem(
-            NSMenuItem(title: "Settings", action: #selector(showSettings), keyEquivalent: ",")
-        )
-        menu.addItem(
-            NSMenuItem(title: "About", action: #selector(showAbout), keyEquivalent: "i")
-        )
-        let hotkeyTitle = AppSettings.shared.hotkeysPaused ? "Resume" : "Pause"
-        menu.addItem(
-            NSMenuItem(title: hotkeyTitle, action: #selector(toggleHotkeys), keyEquivalent: "p")
-        )
-        menu.addItem(
-            NSMenuItem(title: "Reset App", action: #selector(resetApp), keyEquivalent: "r")
-        )
-        menu.addItem(NSMenuItem.separator())
-        menu.addItem(
-            NSMenuItem(
-                title: "Quit",
-                action: #selector(NSApplication.terminate(_:)),
-                keyEquivalent: "q"
-            )
-        )
-
-        statusBarItem.menu = menu
-    }
-
-    @objc private func resetApp() {
+        if let clipboardRestoreObserver {
+            NotificationCenter.default.removeObserver(clipboardRestoreObserver)
+            self.clipboardRestoreObserver = nil
+        }
+        for shortcutName in commandShortcutNamesById.values {
+            KeyboardShortcuts.removeHandler(for: shortcutName)
+        }
+        commandShortcutNamesById.removeAll()
+        CloudCommandsSync.shared.stop()
         WindowManager.shared.cleanupWindows()
-
-        recreateStatusBarItem()
-        setupMenuBar()
-
-        let alert = NSAlert()
-        alert.messageText = "App Reset Complete"
-        alert.informativeText =
-            "The app has been reset. If you're still experiencing issues, try restarting the app."
-        alert.alertStyle = .informational
-        alert.addButton(withTitle: "OK")
-        alert.runModal()
     }
 
     private func performRecoveryReset() {
-        let domain = Bundle.main.bundleIdentifier!
+        guard let domain = Bundle.main.bundleIdentifier else { return }
         UserDefaults.standard.removePersistentDomain(forName: domain)
 
         WindowManager.shared.cleanupWindows()
-
-        recreateStatusBarItem()
-        setupMenuBar()
 
         let alert = NSAlert()
         alert.messageText = "Recovery Complete"
@@ -387,95 +199,21 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             "The app has been reset to its default state."
         alert.alertStyle = .informational
         alert.addButton(withTitle: "OK")
-        alert.runModal()
-    }
-
-    @objc private func showSettings() {
-        settingsWindow?.close()
-        closePopupWindow()
-        settingsWindow = nil
-        settingsHostingView = nil
-
-        settingsWindow = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 540, height: 460),
-            styleMask: [.titled, .closable, .resizable],
-            backing: .buffered,
-            defer: false
-        )
-        settingsWindow?.isReleasedWhenClosed = false
-
-        let settingsView =
-            SettingsView(appState: appState, showOnlyApiSetup: false)
-        settingsHostingView = NSHostingView(rootView: settingsView)
-        settingsWindow?.contentView = settingsHostingView
-        settingsWindow?.delegate = self
-
-        if let window = settingsWindow {
-            window.title = "Settings"
-            window.level = .floating
-            window.center()
-            NSApp.activate(ignoringOtherApps: true)
-            window.makeKeyAndOrderFront(nil)
-            window.orderFrontRegardless()
-        }
-    }
-
-    @objc private func showAbout() {
-        aboutWindow?.close()
-        aboutWindow = nil
-        aboutHostingView = nil
-
-        aboutWindow = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 400, height: 400),
-            styleMask: [.titled, .closable],
-            backing: .buffered,
-            defer: false
-        )
-        aboutWindow?.isReleasedWhenClosed = false
-
-        let aboutView = AboutView()
-        aboutHostingView = NSHostingView(rootView: aboutView)
-        aboutWindow?.contentView = aboutHostingView
-        aboutWindow?.delegate = self
-
-        if let window = aboutWindow {
-            window.title = "About Writing Tools"
-            window.level = .floating
-            window.center()
-            NSApp.activate(ignoringOtherApps: true)
-            window.makeKeyAndOrderFront(nil)
-            window.orderFrontRegardless()
+        
+        NSApp.activate()
+        if let keyWindow = NSApp.keyWindow {
+            alert.beginSheetModal(for: keyWindow)
+        } else {
+            alert.runModal()
         }
     }
 
     private func showOnboarding() {
-        let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 640, height: 720),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable],
-            backing: .buffered,
-            defer: false
-        )
-        window.title = "Welcome to Writing Tools"
-        window.isReleasedWhenClosed = false
-
-        window.center()
-
-        let onboardingView = OnboardingView(appState: appState)
-        let hostingView = NSHostingView(rootView: onboardingView)
-        window.contentView = hostingView
-        window.level = .floating
-
-        WindowManager.shared.setOnboardingWindow(
-            window,
-            hostingView: hostingView
-        )
-        window.makeKeyAndOrderFront(nil)
+        WindowManager.shared.showOnboarding(appState: appState)
     }
 
     @MainActor
     private func showPopup() {
-        appState.activeProvider.cancel()
-
         Task { @MainActor in
             if let frontApp = NSWorkspace.shared.frontmostApplication {
                 self.appState.previousApplication = frontApp
@@ -483,99 +221,65 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
             self.closePopupWindow()
 
-            let pb = NSPasteboard.general
-            let oldChangeCount = pb.changeCount
+            guard let capture = await ClipboardCoordinator.shared.captureSelection() else {
+                logger.debug("Clipboard capture skipped because another operation is in progress")
+                return
+            }
 
-            // Capture the ENTIRE clipboard state before copying
-            let clipboardSnapshot = pb.createSnapshot()
-            logger.debug("Captured clipboard snapshot with \(clipboardSnapshot.itemCount) items")
-
-            // Create and post Cmd+C event
-            let src = CGEventSource(stateID: .hidSystemState)
-            let kd = CGEvent(keyboardEventSource: src, virtualKey: 0x08, keyDown: true)
-            let ku = CGEvent(keyboardEventSource: src, virtualKey: 0x08, keyDown: false)
-            kd?.flags = .maskCommand
-            ku?.flags = .maskCommand
-
-            kd?.post(tap: .cgSessionEventTap)
-            ku?.post(tap: .cgSessionEventTap)
-
-            // Give the system a tiny moment to process the copy event
-            try? await Task.sleep(for: .milliseconds(50)) // 50ms - increased for reliability
-
-            await waitForPasteboardChange(pb, initialChangeCount: oldChangeCount)
-
-            var foundImages: [Data] = []
-            var rich: NSAttributedString? = nil
-            var plainText = ""
-
-            if pb.changeCount > oldChangeCount {
-                let classes = [NSURL.self]
-                let imageTypeIdentifiers = [
-                    UTType.image,
-                    UTType.png,
-                    UTType.jpeg,
-                    UTType.tiff,
-                    UTType.gif,
-                ].map(\.identifier)
-
-                let options: [NSPasteboard.ReadingOptionKey: Any] = [
-                    .urlReadingFileURLsOnly: true,
-                    .urlReadingContentsConformToTypes: imageTypeIdentifiers,
-                ]
-
-                if let urls = pb.readObjects(forClasses: classes, options: options) as? [URL] {
-                    let loadedImages = await loadImageData(from: urls)
-                    if !loadedImages.isEmpty {
-                        foundImages.append(contentsOf: loadedImages)
-                    }
-                }
-
-                if foundImages.isEmpty {
-                    let supportedImageTypes: [NSPasteboard.PasteboardType] = [
-                        NSPasteboard.PasteboardType(UTType.png.identifier),
-                        NSPasteboard.PasteboardType(UTType.jpeg.identifier),
-                        NSPasteboard.PasteboardType(UTType.tiff.identifier),
-                        NSPasteboard.PasteboardType(UTType.gif.identifier),
-                        NSPasteboard.PasteboardType(UTType.image.identifier),
-                    ]
-
-                    for type in supportedImageTypes {
-                        if let data = pb.data(forType: type) {
-                            foundImages.append(data)
-                            logger.debug("Found direct image data of type: \(type.rawValue)")
-                            break
-                        }
-                    }
-                }
-
-                // Read rich text and plain text BEFORE restoring clipboard
-                rich = pb.readAttributedSelection()
-                plainText = rich?.string ?? pb.string(forType: .string) ?? ""
-            } else {
+            if !capture.didChange {
                 logger.warning("Pasteboard did not change after copy; clearing selection to avoid stale context")
             }
 
-            // Store data in appState BEFORE restoring clipboard
-            self.appState.selectedAttributedText = rich
-            self.appState.selectedText = plainText
-            self.appState.selectedImages = foundImages
-
-            // Restore original clipboard using the snapshot
-            pb.restore(snapshot: clipboardSnapshot)
-            logger.debug("Restored original clipboard after capturing selection")
+            self.appState.selectedAttributedText = capture.attributedText
+            self.appState.selectedText = capture.text
+            self.appState.selectedImages = capture.images
 
             let window = PopupWindow(appState: self.appState)
-            if !plainText.isEmpty || !foundImages.isEmpty {
+            if !capture.text.isEmpty || !capture.images.isEmpty {
                 window.setContentSize(NSSize(width: 400, height: 400))
             } else {
                 window.setContentSize(NSSize(width: 400, height: 100))
             }
 
             window.positionNearMouse()
-            NSApp.activate(ignoringOtherApps: true)
+            NSApp.activate()
             window.makeKeyAndOrderFront(nil)
             window.orderFrontRegardless()
+        }
+    }
+
+    private func handleCommandExecutionError(_ error: CommandExecutionEngineError) {
+        switch error {
+        case .captureInProgress:
+            logger.debug("Clipboard capture skipped because another operation is in progress")
+        case .noNewCopiedContent(let commandName):
+            logger.warning("No new content was copied for command: \(commandName)")
+        case .emptySelection(let commandName):
+            logger.info("No text or images selected for command: \(commandName)")
+        case .emptyInstruction:
+            logger.warning("Custom instruction execution failed due to empty instruction")
+        case .customProviderConfigurationIncomplete(let commandName, let missingFields):
+            logger.warning(
+                """
+                Custom provider configuration incomplete for command \(commandName). \
+                Missing fields: \(missingFields.joined(separator: ", "))
+                """
+            )
+        }
+    }
+
+    private func presentCommandErrorAlert(commandName: String, error: Error) async {
+        let alert = NSAlert()
+        alert.messageText = "Command Error"
+        alert.informativeText = "Failed to process '\(commandName)': \(error.localizedDescription)"
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "OK")
+
+        NSApp.activate()
+        if let keyWindow = NSApp.keyWindow {
+            await alert.beginSheetModal(for: keyWindow)
+        } else {
+            alert.runModal()
         }
     }
 
@@ -583,47 +287,84 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         WindowManager.shared.dismissPopup()
     }
 
-    func windowWillClose(_ notification: Notification) {
-        guard !isServiceTriggered else { return }
+    private func configureCloudCommandSync(enabled: Bool) {
+        CloudCommandsSync.shared.setEnabled(enabled)
+        logger.info("iCloud command sync \(enabled ? "enabled" : "disabled")")
+    }
 
-        guard let window = notification.object as? NSWindow else { return }
-        Task { @MainActor [weak self] in
-            if window == self?.settingsWindow {
-                self?.settingsHostingView = nil
-                self?.settingsWindow = nil
-            } else if window == self?.aboutWindow {
-                self?.aboutHostingView = nil
-                self?.aboutWindow = nil
+    private func showICloudQuotaWarningAlert(payloadBytes: Int?, totalBytes: Int?, reason: String?) {
+        let alert = NSAlert()
+        alert.messageText = "iCloud Sync Storage Limit Reached"
+        switch reason {
+        case "preflight_payload_too_large":
+            if let payloadBytes {
+                alert.informativeText =
+                    """
+                    Writing Tools couldn't sync commands because the command payload is too large (\(payloadBytes) bytes).
+                    Try deleting some commands or shortening large prompts, then sync again.
+                    """
+            } else {
+                alert.informativeText =
+                    """
+                    Writing Tools couldn't sync commands because the command payload is too large.
+                    Try deleting some commands or shortening large prompts, then sync again.
+                    """
             }
+        case "preflight_total_store_too_large":
+            if let totalBytes {
+                alert.informativeText =
+                    """
+                    Writing Tools couldn't sync commands because estimated iCloud key-value storage usage reached \(totalBytes) bytes.
+                    Try deleting some commands, shortening large prompts, or clearing old deleted-command history.
+                    """
+            } else {
+                alert.informativeText =
+                    """
+                    Writing Tools couldn't sync commands because iCloud key-value storage quota was exceeded.
+                    Try deleting some commands, shortening large prompts, or clearing old deleted-command history.
+                    """
+            }
+        default:
+            alert.informativeText =
+                """
+                Writing Tools couldn't sync commands because iCloud key-value storage quota was exceeded.
+                Try deleting some commands or shortening large prompts, then sync again.
+                """
+        }
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "OK")
+
+        NSApp.activate()
+        if let keyWindow = NSApp.keyWindow {
+            alert.beginSheetModal(for: keyWindow)
+        } else {
+            alert.runModal()
         }
     }
-}
 
-// MARK: - Image Loading
+    private func showClipboardRestoreSkippedWarningAlert(
+        expectedChangeCount: Int,
+        actualChangeCount: Int
+    ) {
+        let alert = NSAlert()
+        alert.messageText = "Clipboard Was Updated by Another App"
+        alert.informativeText =
+            """
+            Writing Tools captured your selection, but your clipboard changed before it could be restored.
+            Your latest clipboard content was preserved.
+            (Expected change count: \(expectedChangeCount), actual: \(actualChangeCount))
+            """
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "OK")
 
-private extension AppDelegate {
-    func loadImageData(from urls: [URL]) async -> [Data] {
-        await Task.detached(priority: .userInitiated) {
-            var images: [Data] = []
-            images.reserveCapacity(urls.count)
-
-            for url in urls {
-                if let imageData = try? Data(contentsOf: url),
-                   await Self.isValidImageData(imageData) {
-                    images.append(imageData)
-                    logger.debug("Loaded image data from file: \(url.lastPathComponent)")
-                }
-            }
-            return images
-        }.value
-    }
-
-    static func isValidImageData(_ data: Data) -> Bool {
-        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else {
-            return false
+        NSApp.activate()
+        if let keyWindow = NSApp.keyWindow {
+            alert.beginSheetModal(for: keyWindow)
+        } else {
+            alert.runModal()
         }
-        return CGImageSourceGetCount(source) > 0
     }
+
 }
 
 extension AppDelegate {

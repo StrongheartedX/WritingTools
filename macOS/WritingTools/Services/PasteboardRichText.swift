@@ -6,13 +6,14 @@
 //
 
 import AppKit
+import UniformTypeIdentifiers
 
 extension NSPasteboard {
+  @MainActor
   func readAttributedSelection() -> NSAttributedString? {
     // Prefer RTFD (common in Apple apps), then RTF, then HTML
-    if let flatRtfd = data(forType: NSPasteboard.PasteboardType(
-      "com.apple.flat-rtfd"
-    )) {
+    let flatRtfdType = NSPasteboard.PasteboardType(UTType.flatRTFD.identifier)
+    if let flatRtfd = data(forType: flatRtfdType) {
       if let att = try? NSAttributedString(
         data: flatRtfd,
         options: [.documentType: NSAttributedString.DocumentType.rtfd],
@@ -43,6 +44,9 @@ extension NSPasteboard {
     }
 
     if let html = data(forType: .html) {
+      // HTML parsing via NSAttributedString uses WebKit internally and can be
+      // very slow for large payloads. Cap at 256 KB to prevent UI freezes.
+      guard html.count <= 256 * 1024 else { return nil }
       if let att = try? NSAttributedString(
         data: html,
         options: [.documentType: NSAttributedString.DocumentType.html],

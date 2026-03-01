@@ -2,11 +2,15 @@ import Foundation
 import Observation
 import SwiftUI
 
+private let logger = AppLogger.logger("CommandManager")
+
+@MainActor
 @Observable
 final class CommandManager {
     private(set) var commands: [CommandModel] = []
-    
+
     private let saveKey = "unified_commands"
+    private let backupKey = "unified_commands_backup"
     private let hasInitializedKey = "has_initialized_commands"
     private let deletedDefaultsKey = "deleted_default_commands"
     
@@ -37,13 +41,15 @@ final class CommandManager {
     
     func deleteCommand(_ command: CommandModel) {
         commands.removeAll { $0.id == command.id }
-        
+
         // If it's a built-in command, track its ID as deleted
         if command.isBuiltIn {
             deletedDefaultIds.insert(command.id)
             saveDeletedDefaultIds()
         }
-        
+
+        KeychainManager.shared.deleteCustomProviderApiKeySync(for: command.id)
+
         saveCommands()
         notifyCommandsChanged()
     }
@@ -56,6 +62,10 @@ final class CommandManager {
     
     // Public method to replace all commands
     func replaceAllCommands(with newCommands: [CommandModel]) {
+        let removedIds = Set(commands.map(\.id)).subtracting(newCommands.map(\.id))
+        for id in removedIds {
+            KeychainManager.shared.deleteCustomProviderApiKeySync(for: id)
+        }
         commands = newCommands
         saveCommands()
         notifyCommandsChanged()
@@ -84,18 +94,37 @@ final class CommandManager {
         }
         
         // Normal load
-        if let data = UserDefaults.standard.data(forKey: saveKey),
-           let decoded = try? JSONDecoder().decode([CommandModel].self, from: data) {
-            self.commands = decoded
+        if let data = UserDefaults.standard.data(forKey: saveKey) {
+            do {
+                let decoded = try JSONDecoder().decode([CommandModel].self, from: data)
+                self.commands = decoded
+                if containsLegacyCustomProviderKey(in: data) {
+                    saveCommands()
+                    notifyCommandsChanged()
+                }
+            } catch {
+                logger.error("Failed to decode saved commands: \(error.localizedDescription). Backing up corrupted data and resetting to defaults.")
+                // Preserve corrupted data for potential recovery
+                UserDefaults.standard.set(data, forKey: backupKey)
+                initializeDefaultCommands()
+                // Post a notification so the UI can alert the user
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("CommandsLoadFailed"),
+                    object: nil
+                )
+            }
         } else {
-            // Fallback if something went wrong with loading
+            // No saved data at all — initialize defaults
             initializeDefaultCommands()
         }
     }
     
     private func saveCommands() {
-        if let encoded = try? JSONEncoder().encode(commands) {
+        do {
+            let encoded = try JSONEncoder().encode(commands)
             UserDefaults.standard.set(encoded, forKey: saveKey)
+        } catch {
+            logger.error("Failed to encode commands for saving: \(error.localizedDescription)")
         }
     }
     
@@ -110,6 +139,13 @@ final class CommandManager {
         if let encoded = try? JSONEncoder().encode(deletedDefaultIds) {
             UserDefaults.standard.set(encoded, forKey: deletedDefaultsKey)
         }
+    }
+
+    private func containsLegacyCustomProviderKey(in data: Data) -> Bool {
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
+            return false
+        }
+        return json.contains { $0["customProviderApiKey"] != nil }
     }
     
     // MARK: - Default Commands
@@ -168,11 +204,11 @@ final class CommandManager {
         // 3. Newly converted custom commands from the legacy system
         self.commands = defaultCmds + existingCustom + convertedCustom
         
-        // Remove any duplicates (by name)
-        let uniqueCommands = Dictionary(grouping: self.commands, by: { $0.name })
-            .compactMap { $1.first }
-        
-        self.commands = uniqueCommands
+        // Remove duplicates (by ID) while preserving insertion order
+        var seenIds = Set<UUID>()
+        self.commands = self.commands.filter { command in
+            seenIds.insert(command.id).inserted
+        }
         saveCommands()
         notifyCommandsChanged()
     }

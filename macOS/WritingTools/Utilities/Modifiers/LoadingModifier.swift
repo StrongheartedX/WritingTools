@@ -2,10 +2,7 @@ import SwiftUI
 
 struct LoadingBorderModifier: ViewModifier {
     let isLoading: Bool
-    @State private var rotation: Double = 0
-    @Environment(\.colorScheme) var colorScheme
-    
-    private let accentColor = Color.blue
+    @Environment(\.accessibilityReduceMotion) var reduceMotion
     
     func body(content: Content) -> some View {
         content
@@ -26,14 +23,9 @@ struct LoadingBorderModifier: ViewModifier {
                 }
             )
             .disabled(isLoading)
-            .animation(.easeInOut(duration: 0.2), value: isLoading)
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: isLoading)
     }
 }
-// Shared color extension
-extension Color {
-    static let aiPink = Color(red: 255/255, green: 197/255, blue: 211/255)
-}
-
 // LoadingButtonStyle is now moved to CommandButton.swift
 
 // Extension to handle loading state buttons

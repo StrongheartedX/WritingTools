@@ -1,8 +1,16 @@
 import SwiftUI
 
+private enum AboutURLs {
+    static let emailJesai = URL(string: "mailto:jesaitarun@gmail.com")
+    static let blissAI = URL(string: "https://play.google.com/store/apps/details?id=com.jesai.blissai")
+    static let emailArya = URL(string: "mailto:developer@aryamirsepasi.com")
+    static let proseKey = URL(string: "https://apps.apple.com/us/app/prosekey-ai/id6741180175")
+    static let releases = URL(string: "https://github.com/theJayTea/WritingTools/releases")
+}
+
 struct AboutView: View {
     @Bindable private var settings = AppSettings.shared
-    @State private var updateChecker = UpdateChecker.shared
+    private var updateChecker = UpdateChecker.shared
 
     private var appVersion: String {
         let shortVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
@@ -13,6 +21,18 @@ struct AboutView: View {
         }
 
         return shortVersion ?? buildVersion ?? "Unknown"
+    }
+
+    @ViewBuilder
+    private func safeLink(_ title: String, destination: URL?) -> some View {
+        if let destination {
+            Link(title, destination: destination)
+                .buttonStyle(.link)
+        } else {
+            Text(title)
+                .foregroundStyle(.secondary)
+                .help("Link unavailable")
+        }
     }
     
     var body: some View {
@@ -42,8 +62,8 @@ struct AboutView: View {
                         Text("Created with care by Jesai, a high school student.")
                             .bold()
                         HStack(spacing: 12) {
-                            Link("Email Jesai", destination: URL(string: "mailto:jesaitarun@gmail.com")!)
-                            Link("Bliss AI on Google Play", destination: URL(string: "https://play.google.com/store/apps/details?id=com.jesai.blissai")!)
+                            safeLink("Email Jesai", destination: AboutURLs.emailJesai)
+                            safeLink("Bliss AI on Google Play", destination: AboutURLs.blissAI)
                         }
                     }
 
@@ -53,8 +73,8 @@ struct AboutView: View {
                         Text("macOS version by Arya Mirsepasi")
                             .bold()
                         HStack(spacing: 12) {
-                            Link("Email Arya", destination: URL(string: "mailto:developer@aryamirsepasi.com")!)
-                            Link("ProseKey AI (iOS port)", destination: URL(string: "https://apps.apple.com/us/app/prosekey-ai/id6741180175")!)
+                            safeLink("Email Arya", destination: AboutURLs.emailArya)
+                            safeLink("ProseKey AI (iOS port)", destination: AboutURLs.proseKey)
                         }
                     }
                 }
@@ -81,6 +101,11 @@ struct AboutView: View {
                             .foregroundStyle(.green)
                             .font(.caption)
                             .frame(maxWidth: .infinity, alignment: .leading)
+                    } else if !updateChecker.hasCheckedForUpdates {
+                        Text("Not checked yet.")
+                            .foregroundStyle(.secondary)
+                            .font(.caption)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     } else {
                         Text("The latest version is already installed!")
                             .foregroundStyle(.green)
@@ -100,8 +125,7 @@ struct AboutView: View {
                         }
                         .buttonStyle(.borderedProminent)
 
-                        Link("View Releases", destination: URL(string: "https://github.com/theJayTea/WritingTools/releases")!)
-                            .buttonStyle(.link)
+                        safeLink("View Releases", destination: AboutURLs.releases)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }

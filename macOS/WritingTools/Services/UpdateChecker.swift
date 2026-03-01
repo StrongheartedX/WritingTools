@@ -14,6 +14,7 @@ final class UpdateChecker {
     var isCheckingForUpdates = false
     var updateAvailable = false
     var checkError: String?
+    var hasCheckedForUpdates = false
 
     private init() {}
 
@@ -23,7 +24,7 @@ final class UpdateChecker {
         return shortVersion ?? buildVersion
     }
 
-    private func versionComponents(from version: String) -> [Int]? {
+    nonisolated static func versionComponents(from version: String) -> [Int]? {
         let trimmed = version.trimmingCharacters(in: .whitespacesAndNewlines)
         let allowed = CharacterSet(charactersIn: "0123456789.")
         let numericVersion = trimmed
@@ -39,7 +40,7 @@ final class UpdateChecker {
             .compactMap { Int($0) }
     }
 
-    private func isUpdateAvailable(current: String, latest: String) -> Bool? {
+    nonisolated static func isUpdateAvailable(current: String, latest: String) -> Bool? {
         guard let currentComponents = versionComponents(from: current),
               let latestComponents = versionComponents(from: latest) else {
             return nil
@@ -64,6 +65,7 @@ final class UpdateChecker {
         
         defer {
             isCheckingForUpdates = false
+            hasCheckedForUpdates = true
         }
         
         guard let url = URL(string: updateCheckURL) else {
@@ -72,7 +74,9 @@ final class UpdateChecker {
         }
 
         do {
-            let (data, _) = try await URLSession.shared.data(from: url)
+            var request = URLRequest(url: url)
+            request.timeoutInterval = 15
+            let (data, _) = try await URLSession.shared.data(for: request)
             
             // Print raw data for debugging
             if let rawString = String(data: data, encoding: .utf8) {
@@ -91,7 +95,7 @@ final class UpdateChecker {
 
             if let versionString = cleanedString,
                !versionString.isEmpty,
-               let hasUpdate = isUpdateAvailable(current: currentVersionString, latest: versionString) {
+               let hasUpdate = Self.isUpdateAvailable(current: currentVersionString, latest: versionString) {
                 logger.debug("Parsed version: \(versionString)")
                 updateAvailable = hasUpdate
             } else {

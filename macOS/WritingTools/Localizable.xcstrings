@@ -49,6 +49,7 @@
     },
     "(Llama 3.2 3B 4-bit)" : {
       "extractionState" : "manual",
+      "generatesSymbol" : false,
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -329,6 +330,28 @@
         }
       }
     },
+    "Activate Writing Tools shortcut" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Writing Tools-Shortcut aktivieren"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activar atajo de Writing Tools"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activer le raccourci des outils d'écriture"
+          }
+        }
+      }
+    },
     "Activate Writing Tools:" : {
       "localizations" : {
         "de" : {
@@ -529,28 +552,6 @@
         }
       }
     },
-    "All changes saved" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Alle Änderungen gespeichert"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Todos los cambios guardados"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Toutes les modifications enregistrées"
-          }
-        }
-      }
-    },
     "Allow the assistant to acknowledge or comment on content outside the main task" : {
       "localizations" : {
         "de" : {
@@ -683,28 +684,6 @@
         }
       }
     },
-    "API Key" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "API-Schlüssel"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Clave API"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Clé API"
-          }
-        }
-      }
-    },
     "API Key:" : {
       "localizations" : {
         "de" : {
@@ -723,6 +702,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Clé API :"
+          }
+        }
+      }
+    },
+    "App Reset Complete" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App-Reset abgeschlossen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restablecimiento de la app completado"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réinitialisation de l'application terminée"
           }
         }
       }
@@ -811,6 +812,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Apple Silicon requis"
+          }
+        }
+      }
+    },
+    "Apply %@ to selected text" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ auf ausgewählten Text anwenden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aplicar %@ al texto seleccionado"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appliquer %@ au texte sélectionné"
+          }
+        }
+      }
+    },
+    "Are you sure you want to delete \"%@\"? This action cannot be undone." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sind Sie sicher, dass Sie \"%@\" löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Estás seguro de que deseas eliminar \"%@\"? Esta acción no se puede deshacer."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Êtes-vous sûr de vouloir supprimer \"%@\" ? Cette action ne peut pas être annulée."
           }
         }
       }
@@ -1036,28 +1081,6 @@
         }
       }
     },
-    "Bliss AI on Google Play" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bliss AI on Google Play"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bliss AI en Google Play"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bliss AI sur Google Play"
-          }
-        }
-      }
-    },
     "Built-in" : {
       "localizations" : {
         "de" : {
@@ -1120,50 +1143,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Professionnel"
-          }
-        }
-      }
-    },
-    "Button Name" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Schaltflächenname"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nombre del botón"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nom du bouton"
-          }
-        }
-      }
-    },
-    "Can process images directly" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Kann Bilder direkt verarbeiten"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Puede procesar imágenes directamente"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Peut traiter directement les images"
           }
         }
       }
@@ -1410,28 +1389,6 @@
         }
       }
     },
-    "Choose a model to download and use for local processing." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Wählen Sie ein Modell aus, das Sie herunterladen und für die lokale Verarbeitung verwenden möchten."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Elija un modelo para descargarlo y utilizarlo para el procesamiento local."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Choisissez un modèle à télécharger et à utiliser pour le traitement local."
-          }
-        }
-      }
-    },
     "Choose a window appearance that matches your preferences and context." : {
       "localizations" : {
         "de" : {
@@ -1454,28 +1411,6 @@
         }
       }
     },
-    "Choose between performing OCR locally or using an Ollama vision-enabled model for image input." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sie können wählen, ob Sie OCR lokal anwenden oder ein Ollama Vision-fähiges Modell für die Bildeingabe verwenden möchten."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Elija entre realizar el OCR localmente o utilizar un modelo de visión Ollama para la entrada de imágenes."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vous pouvez choisir d'effectuer l'OCR localement ou d'utiliser un modèle de vision Ollama pour la saisie de l'image."
-          }
-        }
-      }
-    },
     "Choose how the popup window looks." : {
       "localizations" : {
         "de" : {
@@ -1494,6 +1429,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Choisissez l'aspect de la fenêtre contextuelle."
+          }
+        }
+      }
+    },
+    "Choose how Writing Tools windows are styled." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wählen Sie aus, wie Writing Tools-Fenster gestaltet werden."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elige cómo se estilizan las ventanas de Writing Tools."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisissez comment les fenêtres de Writing Tools sont stylisées."
           }
         }
       }
@@ -1561,6 +1518,116 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Fermer"
+          }
+        }
+      }
+    },
+    "Close commands manager" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Befehlsmanager schließen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cerrar administrador de comandos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fermer le gestionnaire de commandes"
+          }
+        }
+      }
+    },
+    "Close editor" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Editor schließen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cerrar editor"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fermer l'éditeur"
+          }
+        }
+      }
+    },
+    "Close popup" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Popup schließen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cerrar ventana emergente"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fermer la fenêtre contextuelle"
+          }
+        }
+      }
+    },
+    "Close settings." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Einstellungen schließen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cerrar ajustes."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fermer les paramètres."
+          }
+        }
+      }
+    },
+    "Closes the settings window" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schließt das Einstellungsfenster"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cierra la ventana de ajustes"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ferme la fenêtre des paramètres"
           }
         }
       }
@@ -1830,24 +1897,24 @@
         }
       }
     },
-    "Connection Settings" : {
+    "Connection & Model" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Verbindungseinstellungen"
+            "value" : "Verbindung & Modell"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ajustes de conexión"
+            "value" : "Conexión y modelo"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Paramètres de connexion"
+            "value" : "Connexion et modèle"
           }
         }
       }
@@ -1940,6 +2007,28 @@
         }
       }
     },
+    "Copies this message to the clipboard" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kopiert diese Nachricht in die Zwischenablage"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copia este mensaje al portapapeles"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copie ce message dans le presse-papiers"
+          }
+        }
+      }
+    },
     "Copy" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1981,6 +2070,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tout copier"
+          }
+        }
+      }
+    },
+    "Copy message" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nachricht kopieren"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copiar mensaje"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copier le message"
           }
         }
       }
@@ -2139,6 +2250,28 @@
         }
       }
     },
+    "Custom instruction" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Benutzerdefinierte Anweisung"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Instrucción personalizada"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Instruction personnalisée"
+          }
+        }
+      }
+    },
     "Custom Model Name" : {
       "localizations" : {
         "de" : {
@@ -2271,6 +2404,28 @@
         }
       }
     },
+    "Delete" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Löschen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eliminar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer"
+          }
+        }
+      }
+    },
     "Delete %@" : {
       "localizations" : {
         "de" : {
@@ -2315,6 +2470,28 @@
         }
       }
     },
+    "Delete Command" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Befehl löschen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eliminar comando"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer la commande"
+          }
+        }
+      }
+    },
     "Delete Model" : {
       "localizations" : {
         "de" : {
@@ -2333,6 +2510,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Supprimer le modèle"
+          }
+        }
+      }
+    },
+    "Describe how to modify the selected text" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beschreiben Sie, wie der ausgewählte Text geändert werden soll"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Describe cómo modificar el texto seleccionado"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Décrivez comment modifier le texte sélectionné"
           }
         }
       }
@@ -2381,6 +2580,72 @@
         }
       }
     },
+    "Discard changes and close" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Änderungen verwerfen und schließen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Descartar cambios y cerrar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ignorer les modifications et fermer"
+          }
+        }
+      }
+    },
+    "Dismiss the commands window" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Befehlsfenster schließen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cerrar la ventana de comandos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fermer la fenêtre des commandes"
+          }
+        }
+      }
+    },
+    "Dismiss the popup" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Popup schließen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cerrar la ventana emergente"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fermer la fenêtre contextuelle"
+          }
+        }
+      }
+    },
     "Display response in window" : {
       "localizations" : {
         "de" : {
@@ -2403,24 +2668,24 @@
         }
       }
     },
-    "Documentation" : {
+    "Done" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dokumentation"
+            "value" : "Fertig"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Documentación"
+            "value" : "Listo"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Documentation"
+            "value" : "Terminé"
           }
         }
       }
@@ -2871,6 +3136,28 @@
         }
       }
     },
+    "Edit %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ bearbeiten"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Editar %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modifier %@"
+          }
+        }
+      }
+    },
     "Edit Built-In Command" : {
       "localizations" : {
         "de" : {
@@ -2937,6 +3224,50 @@
         }
       }
     },
+    "Edit command list" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Befehlsliste bearbeiten"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Editar lista de comandos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modifier la liste des commandes"
+          }
+        }
+      }
+    },
+    "Edit commands" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Befehle bearbeiten"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Editar comandos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modifier les commandes"
+          }
+        }
+      }
+    },
     "Edit Commands" : {
       "localizations" : {
         "de" : {
@@ -2955,6 +3286,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Modifier la commande"
+          }
+        }
+      }
+    },
+    "Edit this command's details" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Details dieses Befehls bearbeiten"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Editar los detalles de este comando"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modifier les détails de cette commande"
           }
         }
       }
@@ -3003,50 +3356,6 @@
         }
       }
     },
-    "Email Arya" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Email Arya"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Correo electrónico a Arya"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Email à Arya"
-          }
-        }
-      }
-    },
-    "Email Jesai" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Email Jesai"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Correo electrónico a Jesai"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Email à Jesai"
-          }
-        }
-      }
-    },
     "Enable keyboard shortcut for this command" : {
       "localizations" : {
         "de" : {
@@ -3065,6 +3374,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Activer le raccourci clavier pour cette commande"
+          }
+        }
+      }
+    },
+    "Enable Screenshot OCR" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Screenshot-OCR aktivieren"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Habilitar OCR de captura de pantalla"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activer l'OCR de capture d'écran"
           }
         }
       }
@@ -3201,6 +3532,28 @@
         }
       }
     },
+    "Exit edit mode" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bearbeitungsmodus verlassen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Salir del modo de edición"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quitter le mode édition"
+          }
+        }
+      }
+    },
     "Exit Edit Mode" : {
       "localizations" : {
         "de" : {
@@ -3267,6 +3620,28 @@
         }
       }
     },
+    "Filter:" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Filter:"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Filtro:"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Filtre :"
+          }
+        }
+      }
+    },
     "Finish" : {
       "localizations" : {
         "de" : {
@@ -3329,6 +3704,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Première personne"
+          }
+        }
+      }
+    },
+    "Follow-up question" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Folgefrage"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pregunta de seguimiento"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Question de suivi"
           }
         }
       }
@@ -3488,6 +3885,28 @@
         }
       }
     },
+    "Generating..." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Generieren..."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Generando..."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Génération en cours..."
+          }
+        }
+      }
+    },
     "Get Anthropic API Key" : {
       "localizations" : {
         "de" : {
@@ -3642,28 +4061,6 @@
         }
       }
     },
-    "Glass" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Glas"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vidrio"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Verre"
-          }
-        }
-      }
-    },
     "Global Shortcut" : {
       "localizations" : {
         "de" : {
@@ -3686,28 +4083,6 @@
         }
       }
     },
-    "Gradient" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Gradient"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Gradiente"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dégradé"
-          }
-        }
-      }
-    },
     "Granted" : {
       "localizations" : {
         "de" : {
@@ -3726,6 +4101,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Accordé"
+          }
+        }
+      }
+    },
+    "Hide %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ ausblenden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ocultar %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Masquer %@"
           }
         }
       }
@@ -3928,24 +4325,24 @@
         }
       }
     },
-    "Keep Alive Time" : {
+    "Keep Alive" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Verweildauer"
+            "value" : "Am Leben erhalten"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tiempo de mantenimiento activo"
+            "value" : "Mantener activo"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Durée de maintien actif"
+            "value" : "Maintenir actif"
           }
         }
       }
@@ -3968,6 +4365,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Durée de maintien actif (par exemple, 5m, 1h)"
+          }
+        }
+      }
+    },
+    "Keep your command list in sync across your signed-in Apple devices." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Halten Sie Ihre Befehlsliste auf allen angemeldeten Apple-Geräten synchron."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mantén tu lista de comandos sincronizada en todos tus dispositivos Apple con sesión iniciada."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gardez votre liste de commandes synchronisée sur tous vos appareils Apple connectés."
           }
         }
       }
@@ -4039,24 +4458,46 @@
         }
       }
     },
-    "Leave empty to use the default model for the selected provider. Examples: gpt-4o-mini (OpenAI), claude-3-5-sonnet-20240620 (Anthropic), gemini-flash-latest (Gemini)" : {
+    "Leave empty to use the default model for the selected provider. Examples: gpt-5-mini (OpenAI), claude-sonnet-4-5 (Anthropic), gemini-flash-latest (Gemini)" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lassen Sie dieses Feld leer, um das Standardmodell für den ausgewählten Anbieter zu verwenden. Beispiele: gpt-4o-mini (OpenAI), claude-3-5-sonnet-20240620 (Anthropic), gemini-flash-latest (Gemini)"
+            "value" : "Leer lassen, um das Standardmodell für den ausgewählten Anbieter zu verwenden. Beispiele: gpt-5-mini (OpenAI), claude-sonnet-4-5 (Anthropic), gemini-flash-latest (Gemini)"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Déjelo vacío para usar el modelo predeterminado del proveedor seleccionado. Ejemplos: gpt-4o-mini (OpenAI), claude-3-5-sonnet-20240620 (Anthropic), gemini-flash-latest (Gemini)"
+            "value" : "Dejar vacío para usar el modelo predeterminado del proveedor seleccionado. Ejemplos: gpt-5-mini (OpenAI), claude-sonnet-4-5 (Anthropic), gemini-flash-latest (Gemini)"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Laissez vide pour utiliser le modèle par défaut du fournisseur sélectionné. Exemples : gpt-4o-mini (OpenAI), claude-3-5-sonnet-20240620 (Anthropic), gemini-flash-latest (Gemini)"
+            "value" : "Laisser vide pour utiliser le modèle par défaut du fournisseur sélectionné. Exemples : gpt-5-mini (OpenAI), claude-sonnet-4-5 (Anthropic), gemini-flash-latest (Gemini)"
+          }
+        }
+      }
+    },
+    "Link unavailable" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Link nicht verfügbar"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enlace no disponible"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lien indisponible"
           }
         }
       }
@@ -4101,50 +4542,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Chargement du modèle"
-          }
-        }
-      }
-    },
-    "Loading model into memory" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Modell wird in den Speicher geladen"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cargando modelo en la memoria"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Chargement du modèle en mémoire"
-          }
-        }
-      }
-    },
-    "Loading model into memory..." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Modell in den Speicher laden..."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cargando modelo en memoria..."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Chargement du modèle en mémoire..."
           }
         }
       }
@@ -4283,24 +4680,24 @@
         }
       }
     },
-    "Local LLM processing is only available on Apple Silicon (M-series) devices." : {
+    "Local LLM processing is only available on Apple Silicon (M-series) devices. Please select a different AI Provider." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Die lokale LLM-Verarbeitung ist nur auf Geräten der Apple Silicon (M-Serie) verfügbar."
+            "value" : "Die lokale LLM-Verarbeitung ist nur auf Apple Silicon (M-Serie) Geräten verfügbar. Bitte wählen Sie einen anderen KI-Anbieter."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "El procesamiento LLM local solo está disponible en dispositivos Apple Silicon (serie M)."
+            "value" : "El procesamiento LLM local solo está disponible en dispositivos Apple Silicon (serie M). Por favor, selecciona un proveedor de IA diferente."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Le traitement LLM local n'est disponible que sur les appareils Apple Silicon (série M)."
+            "value" : "Le traitement LLM local n'est disponible que sur les appareils Apple Silicon (série M). Veuillez sélectionner un autre fournisseur d'IA."
           }
         }
       }
@@ -4389,6 +4786,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Conserver la mise en forme originale du texte (sauts de ligne, espacement, etc.)"
+          }
+        }
+      }
+    },
+    "Makes the response text larger" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Macht den Antworttext größer"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hace el texto de respuesta más grande"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agrandit le texte de réponse"
+          }
+        }
+      }
+    },
+    "Makes the response text smaller" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Macht den Antworttext kleiner"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hace el texto de respuesta más pequeño"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réduit le texte de réponse"
           }
         }
       }
@@ -4569,28 +5010,6 @@
         }
       }
     },
-    "Model Filters" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Model Filters"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Filtros de modelo"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Filtres de modèle"
-          }
-        }
-      }
-    },
     "Model Information" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4680,6 +5099,28 @@
         }
       }
     },
+    "Most changes apply automatically. Click Done to apply API key updates." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die meisten Änderungen werden automatisch übernommen. Klicken Sie auf \"Fertig\", um API-Schlüssel-Aktualisierungen anzuwenden."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La mayoría de los cambios se aplican automáticamente. Haz clic en Listo para aplicar las actualizaciones de la clave API."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La plupart des modifications s'appliquent automatiquement. Cliquez sur Terminé pour appliquer les mises à jour de la clé API."
+          }
+        }
+      }
+    },
     "Name" : {
       "localizations" : {
         "de" : {
@@ -4720,28 +5161,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Neutre"
-          }
-        }
-      }
-    },
-    "New Command" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Neuer Befehl"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nuevo mando"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nouvelle commande"
           }
         }
       }
@@ -4856,6 +5275,28 @@
         }
       }
     },
+    "Not checked yet." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Noch nicht überprüft."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aún no verificado."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pas encore vérifié."
+          }
+        }
+      }
+    },
     "Notes" : {
       "localizations" : {
         "de" : {
@@ -4896,28 +5337,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "OK"
-          }
-        }
-      }
-    },
-    "OLED" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "OLED"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "OLED"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "OLED"
           }
         }
       }
@@ -4988,7 +5407,7 @@
         }
       }
     },
-    "Ollama Documentation" : {
+    "Ollama Docs" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -5010,24 +5429,24 @@
         }
       }
     },
-    "Ollama Model" : {
+    "Ollama Documentation" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ollama Model"
+            "value" : "Ollama-Dokumentation"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Modelo Ollama"
+            "value" : "Documentación de Ollama"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Modèle Ollama"
+            "value" : "Documentation Ollama"
           }
         }
       }
@@ -5142,6 +5561,28 @@
         }
       }
     },
+    "Open editor for this command" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Editor für diesen Befehl öffnen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrir editor para este comando"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir l'éditeur pour cette commande"
+          }
+        }
+      }
+    },
     "Open Google AI Studio to generate an API key." : {
       "localizations" : {
         "de" : {
@@ -5186,24 +5627,24 @@
         }
       }
     },
-    "Open Ollama download and documentation page in your browser." : {
+    "Open Ollama download and documentation page." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Öffnen Sie die Download- und Dokumentationsseite von Ollama in Ihrem Browser."
+            "value" : "Ollama Download- und Dokumentationsseite öffnen."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Abre la página de descarga y documentación de Ollama en tu navegador."
+            "value" : "Abrir la página de descarga y documentación de Ollama."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ouvrez la page de téléchargement et de documentation d'Ollama dans votre navigateur."
+            "value" : "Ouvrir la page de téléchargement et de documentation d'Ollama."
           }
         }
       }
@@ -5274,6 +5715,28 @@
         }
       }
     },
+    "Open Privacy and Security settings" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Datenschutz- und Sicherheitseinstellungen öffnen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrir configuración de privacidad y seguridad"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir les paramètres de confidentialité et sécurité"
+          }
+        }
+      }
+    },
     "Open System Settings to manage permissions." : {
       "localizations" : {
         "de" : {
@@ -5314,6 +5777,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ouvrez le gestionnaire de commandes pour ajouter, modifier ou supprimer des commandes."
+          }
+        }
+      }
+    },
+    "Open the folder where local models are stored." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Den Ordner öffnen, in dem lokale Modelle gespeichert sind."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrir la carpeta donde se almacenan los modelos locales."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir le dossier où les modèles locaux sont stockés."
+          }
+        }
+      }
+    },
+    "Open the onboarding window to review permissions and setup." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Onboarding-Fenster öffnen, um Berechtigungen und Einrichtung zu überprüfen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrir la ventana de incorporación para revisar permisos y configuración."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir la fenêtre d'intégration pour vérifier les autorisations et la configuration."
           }
         }
       }
@@ -5450,28 +5957,6 @@
         }
       }
     },
-    "Or Custom Model Name" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Oder Benutzerdefinierter Modellname"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "O nombre de modelo personalizado"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ou Nom De Modèle Personnalisé"
-          }
-        }
-      }
-    },
     "Organization ID (Optional)" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5539,6 +6024,28 @@
         }
       }
     },
+    "Pause Hotkeys" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hotkeys pausieren"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pausar teclas de acceso rápido"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mettre en pause les raccourcis"
+          }
+        }
+      }
+    },
     "Personality:" : {
       "localizations" : {
         "de" : {
@@ -5557,50 +6064,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Personnalité :"
-          }
-        }
-      }
-    },
-    "Please select a different AI Provider in Settings if you are on an Intel Mac." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bitte wählen Sie in den Einstellungen einen anderen KI-Anbieter aus, wenn Sie einen Intel-Mac verwenden."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Por favor, selecciona un proveedor de IA diferente en Configuración si estás en un Mac Intel."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Veuillez sélectionner un autre fournisseur d'IA dans les paramètres si vous utilisez un Mac Intel."
-          }
-        }
-      }
-    },
-    "Please select a model from the dropdown above to see its status and download options." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bitte wählen Sie ein Modell aus der obigen Dropdown-Liste aus, um den Status und die Download-Optionen anzuzeigen."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Seleccione un modelo del menú desplegable de arriba para ver su estado y las opciones de descarga."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Veuillez sélectionner un modèle dans la liste déroulante ci-dessus pour voir son statut et ses options de téléchargement."
           }
         }
       }
@@ -5847,6 +6310,31 @@
         }
       }
     },
+    "Processing" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verarbeitung"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Procesando"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Traitement en cours"
+          }
+        }
+      }
+    },
+    "Processing…" : {
+
+    },
     "Professional" : {
       "comment" : "ID for professional tone",
       "localizations" : {
@@ -5938,28 +6426,6 @@
         }
       }
     },
-    "ProseKey AI (iOS port)" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ProseKey AI (iOS port)"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ProseKey AI (puerto iOS)"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ProseKey AI (port iOS)"
-          }
-        }
-      }
-    },
     "Provider" : {
       "localizations" : {
         "de" : {
@@ -6004,6 +6470,28 @@
         }
       }
     },
+    "Provider settings" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anbieter-Einstellungen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Configuración del proveedor"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paramètres du fournisseur"
+          }
+        }
+      }
+    },
     "Provider:" : {
       "localizations" : {
         "de" : {
@@ -6026,6 +6514,28 @@
         }
       }
     },
+    "Quit" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beenden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Salir"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quitter"
+          }
+        }
+      }
+    },
     "Recheck current permission statuses." : {
       "localizations" : {
         "de" : {
@@ -6044,6 +6554,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Vérifiez à nouveau l'état des autorisations actuelles."
+          }
+        }
+      }
+    },
+    "Refresh permission status" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Berechtigungsstatus aktualisieren"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Actualizar estado de permisos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Actualiser l'état des autorisations"
           }
         }
       }
@@ -6114,6 +6646,50 @@
         }
       }
     },
+    "Remove this command" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diesen Befehl entfernen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eliminar este comando"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer cette commande"
+          }
+        }
+      }
+    },
+    "Removes this command" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entfernt diesen Befehl"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elimina este comando"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprime cette commande"
+          }
+        }
+      }
+    },
     "Required" : {
       "localizations" : {
         "de" : {
@@ -6132,6 +6708,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Obligatoire"
+          }
+        }
+      }
+    },
+    "Requires Screen Recording permission to use OCR on screenshots." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erfordert die Berechtigung zur Bildschirmaufnahme, um OCR auf Screenshots zu verwenden."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Requiere permiso de grabación de pantalla para usar OCR en capturas de pantalla."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nécessite une autorisation d'enregistrement d'écran pour utiliser l'OCR sur les captures d'écran."
           }
         }
       }
@@ -6180,6 +6778,28 @@
         }
       }
     },
+    "Reset App" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App zurücksetzen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restablecer app"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réinitialiser l'application"
+          }
+        }
+      }
+    },
     "Reset Built-in Commands" : {
       "localizations" : {
         "de" : {
@@ -6224,6 +6844,28 @@
         }
       }
     },
+    "Reset text size" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Textgröße zurücksetzen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restablecer tamaño del texto"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réinitialiser la taille du texte"
+          }
+        }
+      }
+    },
     "Reset to Defaults" : {
       "localizations" : {
         "de" : {
@@ -6242,6 +6884,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Réinitialiser les valeurs par défaut"
+          }
+        }
+      }
+    },
+    "Reset Writing Tools?" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Writing Tools zurücksetzen?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Restablecer Writing Tools?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réinitialiser Writing Tools ?"
+          }
+        }
+      }
+    },
+    "Restart onboarding" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Onboarding neu starten"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reiniciar la incorporación"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Redémarrer l'intégration"
           }
         }
       }
@@ -6268,6 +6954,28 @@
         }
       }
     },
+    "Resume Hotkeys" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hotkeys fortsetzen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reanudar teclas de acceso rápido"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reprendre les raccourcis"
+          }
+        }
+      }
+    },
     "Retry Download" : {
       "localizations" : {
         "de" : {
@@ -6286,6 +6994,72 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Réessayer le téléchargement"
+          }
+        }
+      }
+    },
+    "Return to command list" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zurück zur Befehlsliste"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Volver a la lista de comandos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retour à la liste des commandes"
+          }
+        }
+      }
+    },
+    "Returns text size to the default" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Setzt die Textgröße auf den Standard zurück"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Devuelve el tamaño del texto al predeterminado"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remet la taille du texte à la valeur par défaut"
+          }
+        }
+      }
+    },
+    "Reveal %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ anzeigen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrar %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Révéler %@"
           }
         }
       }
@@ -6379,7 +7153,7 @@
         }
       }
     },
-    "Save Changes" : {
+    "Save changes" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -6401,24 +7175,24 @@
         }
       }
     },
-    "Save your changes and close settings." : {
+    "Save Changes" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Speichern Sie Ihre Änderungen und schließen Sie die Einstellungen."
+            "value" : "Änderungen speichern"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Guarda tus cambios y cierra la configuración."
+            "value" : "Guardar cambios"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Enregistrez vos modifications et fermez les paramètres."
+            "value" : "Enregistrer les modifications"
           }
         }
       }
@@ -6463,6 +7237,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sélectionnez un modèle local. Les modèles capables de vision peuvent traiter les images."
+          }
+        }
+      }
+    },
+    "Select a model above to see its status." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wählen Sie oben ein Modell aus, um seinen Status zu sehen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Selecciona un modelo arriba para ver su estado."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sélectionnez un modèle ci-dessus pour voir son état."
           }
         }
       }
@@ -6666,6 +7462,72 @@
         }
       }
     },
+    "Sets the global shortcut to open Writing Tools." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Legt den globalen Shortcut zum Öffnen von Writing Tools fest."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Establece el atajo global para abrir Writing Tools."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Définit le raccourci global pour ouvrir Writing Tools."
+          }
+        }
+      }
+    },
+    "Settings" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Einstellungen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajustes"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paramètres"
+          }
+        }
+      }
+    },
+    "Settings Incomplete" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Einstellungen unvollständig"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajustes incompletos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paramètres incomplets"
+          }
+        }
+      }
+    },
     "Shortcut:" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6685,6 +7547,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Raccourci :"
+          }
+        }
+      }
+    },
+    "Show Models in Finder" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modelle im Finder anzeigen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrar modelos en el Finder"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher les modèles dans le Finder"
           }
         }
       }
@@ -6711,50 +7595,6 @@
         }
       }
     },
-    "Show Response in Chat Window" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Antwort im Chat-Fenster anzeigen"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mostrar respuesta en la ventana de chat"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Afficher la réponse dans la fenêtre de chat"
-          }
-        }
-      }
-    },
-    "Standard" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Standard"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Estándar"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Standard"
-          }
-        }
-      }
-    },
     "Standard uses system backgrounds. Glass respects transparency preferences. OLED uses deep blacks." : {
       "localizations" : {
         "de" : {
@@ -6777,24 +7617,52 @@
         }
       }
     },
-    "Status: %@" : {
+    "Status" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Status: %@"
+            "value" : "Status"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Estado: %@"
+            "value" : "Estado"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Status: %@"
+            "value" : "État"
+          }
+        }
+      }
+    },
+    "Step %lld of %lld" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schritt %1$lld von %2$lld"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Step %1$lld of %2$lld"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paso %1$lld de %2$lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Étape %1$lld sur %2$lld"
           }
         }
       }
@@ -6844,6 +7712,28 @@
         }
       }
     },
+    "Sync commands with iCloud" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Befehle mit iCloud synchronisieren"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sincronizar comandos con iCloud"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Synchroniser les commandes avec iCloud"
+          }
+        }
+      }
+    },
     "Table" : {
       "comment" : "ID for table conversion",
       "localizations" : {
@@ -6889,24 +7779,46 @@
         }
       }
     },
-    "Text-only model" : {
+    "Text-only" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Modell für Text nur"
+            "value" : "Nur Text"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Modelo sólo texto"
+            "value" : "Solo texto"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Modèle texte uniquement"
+            "value" : "Texte uniquement"
+          }
+        }
+      }
+    },
+    "The app has been reset. If you're still experiencing issues, try restarting the app." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die App wurde zurückgesetzt. Wenn weiterhin Probleme auftreten, versuchen Sie, die App neu zu starten."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La app ha sido restablecida. Si sigues experimentando problemas, intenta reiniciar la app."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L'application a été réinitialisée. Si vous rencontrez toujours des problèmes, essayez de redémarrer l'application."
           }
         }
       }
@@ -7083,6 +7995,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cela réinitialisera toutes les commandes intégrées à leurs paramètres d'origine, restaurera toutes les commandes intégrées supprimées et conservera vos commandes personnalisées. Cette action ne peut pas être annulée."
+          }
+        }
+      }
+    },
+    "This will reset windows and UI state. Your commands and settings will remain." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dadurch werden Fenster und der UI-Zustand zurückgesetzt. Ihre Befehle und Einstellungen bleiben erhalten."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esto restablecerá las ventanas y el estado de la interfaz. Tus comandos y ajustes se mantendrán."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cela réinitialisera les fenêtres et l'état de l'interface. Vos commandes et paramètres resteront."
           }
         }
       }
@@ -7351,6 +8285,28 @@
         }
       }
     },
+    "Use OCR locally or a vision-enabled model for images." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verwenden Sie OCR lokal oder ein sehfähiges Modell für Bilder."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usa OCR localmente o un modelo con capacidad de visión para las imágenes."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Utilisez l'OCR localement ou un modèle doté de capacités visuelles pour les images."
+          }
+        }
+      }
+    },
     "Use Proofread to preserve formatting while fixing grammar/spelling." : {
       "localizations" : {
         "de" : {
@@ -7391,6 +8347,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Utiliser des tableaux"
+          }
+        }
+      }
+    },
+    "Uses iCloud key-value storage to sync command edits across devices." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verwendet den iCloud-Schlüssel-Wert-Speicher, um Befehlsbearbeitungen geräteübergreifend zu synchronisieren."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usa el almacenamiento clave-valor de iCloud para sincronizar las ediciones de comandos entre dispositivos."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Utilise le stockage clé-valeur iCloud pour synchroniser les modifications de commandes sur tous les appareils."
           }
         }
       }
@@ -7485,46 +8463,24 @@
         }
       }
     },
-    "View Releases" : {
+    "Vision-capable" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Veröffentlichungen anzeigen"
+            "value" : "Sehfähig"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ver lanzamientos"
+            "value" : "Con capacidad de visión"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Voir les versions"
-          }
-        }
-      }
-    },
-    "Vision-capable model" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vision-fähiges Modell"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Modelo con capacidad de visión"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Modèle capable de vision"
+            "value" : "Capable de vision"
           }
         }
       }
@@ -7551,50 +8507,6 @@
         }
       }
     },
-    "What should your AI do with your selected text? (Prompt)" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Was soll Ihre KI mit Ihrem ausgewählten Text tun? (Prompt)"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "¿Qué debería hacer tu IA con el texto seleccionado? (Pregunta)"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Que doit faire votre IA avec le texte sélectionné ? (Invite)"
-          }
-        }
-      }
-    },
-    "When enabled, responses will appear in a chat window instead of replacing the selected text." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Wenn aktiviert, werden Antworten in einem Chat-Fenster angezeigt, anstatt den ausgewählten Text zu ersetzen."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Si está activada, las respuestas aparecerán en una ventana de chat en lugar de sustituir al texto seleccionado."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lorsqu'elle est activée, les réponses apparaîtront dans une fenêtre de chat au lieu de remplacer le texte sélectionné."
-          }
-        }
-      }
-    },
     "When enabled, the selected text is treated as content to process, not as instructions" : {
       "localizations" : {
         "de" : {
@@ -7613,6 +8525,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Lorsque cette option est activée, le texte sélectionné est traité comme du contenu à traiter, et non comme des instructions."
+          }
+        }
+      }
+    },
+    "When off, custom prompts replace selected text inline." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wenn deaktiviert, ersetzen benutzerdefinierte Eingabeaufforderungen den ausgewählten Text inline."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cuando está desactivado, los indicadores personalizados reemplazan el texto seleccionado en línea."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lorsque désactivé, les invites personnalisées remplacent le texte sélectionné en ligne."
           }
         }
       }
@@ -7679,6 +8613,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Fonctionne dans toutes les applications prenant en charge le copier-coller."
+          }
+        }
+      }
+    },
+    "Writing Tools" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Writing Tools"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Writing Tools"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Writing Tools"
           }
         }
       }

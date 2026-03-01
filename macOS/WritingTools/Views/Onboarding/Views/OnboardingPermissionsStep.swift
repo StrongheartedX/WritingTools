@@ -10,9 +10,9 @@ import ApplicationServices
 import CoreGraphics
 
 struct OnboardingPermissionsStep: View {
-  @State var isAccessibilityGranted: Bool
-  @State var isScreenRecordingGranted: Bool
-  @State var wantsScreenshotOCR: Bool
+  @Binding var isAccessibilityGranted: Bool
+  @Binding var isScreenRecordingGranted: Bool
+  @Binding var wantsScreenshotOCR: Bool
 
   var onRefresh: () -> Void
   var onOpenPrivacyPane: (String) -> Void
@@ -21,6 +21,7 @@ struct OnboardingPermissionsStep: View {
     VStack(alignment: .leading, spacing: 16) {
       Text("Required")
         .font(.headline)
+        .accessibilityAddTraits(.isHeader)
 
       PermissionRow(
         icon: "figure.wave.circle.fill",
@@ -58,6 +59,8 @@ struct OnboardingPermissionsStep: View {
         }
       }
       .toggleStyle(.switch)
+      .accessibilityLabel("Enable Screenshot OCR")
+      .accessibilityHint("Requires Screen Recording permission to use OCR on screenshots.")
 
       if wantsScreenshotOCR {
         PermissionRow(
@@ -88,6 +91,7 @@ struct OnboardingPermissionsStep: View {
         VStack(alignment: .leading, spacing: 8) {
           Text("Notes")
             .font(.headline)
+            .accessibilityAddTraits(.isHeader)
           VStack(alignment: .leading, spacing: 6) {
             Label(
               "You can revoke any permission later in System Settings.",
@@ -108,19 +112,21 @@ struct OnboardingPermissionsStep: View {
           onRefresh()
         }
         .buttonStyle(.bordered)
+        .accessibilityLabel("Refresh permission status")
         .help("Recheck current permission statuses.")
 
         Spacer()
 
         Button("Open Privacy & Security") {
-          NSWorkspace.shared.open(
-            URL(
-              string:
-                "x-apple.systempreferences:com.apple.preference.security"
-            )!
-          )
+          if let url = URL(
+            string:
+              "x-apple.systemsettings:com.apple.settings.PrivacySecurity.extension"
+          ) {
+            NSWorkspace.shared.open(url)
+          }
         }
         .buttonStyle(.link)
+        .accessibilityLabel("Open Privacy and Security settings")
         .help("Open System Settings to manage permissions.")
       }
       .padding(.top, 4)
@@ -140,7 +146,7 @@ struct OnboardingPermissionsHelper {
       try? await Task.sleep(for: .milliseconds(200))
       if let url = URL(
         string:
-          "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+          "x-apple.systemsettings:com.apple.settings.PrivacySecurity.extension?Privacy_Accessibility"
       ) {
         NSWorkspace.shared.open(url)
       }
@@ -148,23 +154,12 @@ struct OnboardingPermissionsHelper {
   }
 
   static func checkScreenRecording() -> Bool {
-    if #available(macOS 10.15, *) {
-      return CGPreflightScreenCaptureAccess()
-    } else {
-      return true
-    }
+    CGPreflightScreenCaptureAccess()
   }
 
   static func requestScreenRecording(completion: @escaping (Bool) -> Void) {
-    if #available(macOS 10.15, *) {
-      Task.detached(priority: .userInitiated) {
-        let granted = CGRequestScreenCaptureAccess()
-        await MainActor.run {
-          completion(granted)
-        }
-      }
-    } else {
-      completion(true)
-    }
+    // CGRequestScreenCaptureAccess may present system UI, so it must run on the main thread.
+    let granted = CGRequestScreenCaptureAccess()
+    completion(granted)
   }
 }

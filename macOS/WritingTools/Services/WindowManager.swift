@@ -3,204 +3,254 @@ import AppKit
 
 private let logger = AppLogger.logger("WindowManager")
 
+@MainActor
 class WindowManager: NSObject, NSWindowDelegate {
     static let shared = WindowManager()
 
-    private var onboardingWindow =
-        NSMapTable<NSWindow, NSHostingView<OnboardingView>>.strongToWeakObjects()
-    private var settingsWindow =
-        NSMapTable<NSWindow, NSHostingView<SettingsView>>.strongToWeakObjects()
+    private var onboardingWindow: NSWindow?
+    private var settingsWindow: NSWindow?
 
     // Track a single PopupWindow
     private weak var popupWindow: PopupWindow?
 
+    enum PopupDismissSuppressionReason: Hashable {
+        case commandEditorSheet
+        case commandsManagerSheet
+    }
+
+    private var popupDismissSuppressionReasons: Set<PopupDismissSuppressionReason> = []
+    private var popupDismissSuppressionResetTask: Task<Void, Never>?
+    private let popupDismissSuppressionFailsafeDelay: Duration = .seconds(2)
+
+    var isPopupDismissSuppressed: Bool {
+        !popupDismissSuppressionReasons.isEmpty
+    }
+
     private var responseWindows = NSHashTable<ResponseWindow>.weakObjects()
-    
-    private var cleanupTimer: Timer?
-
-    // Execute operation on main thread
-    private func performOnMainThread(_ operation: @escaping () -> Void) {
-        if Thread.isMainThread {
-            operation()
-        } else {
-            Task { @MainActor in
-                operation()
-            }
-        }
-    }
-
-    // Execute operation on window queue
-    private func performOnWindowQueue(_ operation: @escaping () -> Void) {
-        Task(priority: .userInitiated) { @MainActor [weak self] in
-            guard self != nil else { return }
-            operation()
-        }
-    }
 
     // MARK: - Response Windows
 
     func addResponseWindow(_ window: ResponseWindow) {
-        performOnMainThread { [weak self] in
-            guard let self = self, !window.isReleasedWhenClosed else {
-                logger.error("Attempted to add a released window.")
-                return
-            }
-            if !self.responseWindows.contains(window) {
-                self.responseWindows.add(window)
-                window.delegate = self
-            }
-            window.makeKeyAndOrderFront(nil)
+        guard !window.isReleasedWhenClosed else {
+            logger.error("Attempted to add a released window.")
+            return
         }
+        if !responseWindows.contains(window) {
+            responseWindows.add(window)
+            window.delegate = self
+        }
+        bringWindowToFront(window)
+    }
+
+    /// Activates the app and brings the given window to the front.
+    ///
+    /// Accessory apps (`NSApp.activationPolicy == .accessory`) don't appear in the
+    /// Dock, so `NSApp.activate()` alone may not suffice. `orderFrontRegardless()`
+    /// ensures the window appears above other apps even if activation is delayed.
+    func bringWindowToFront(_ window: NSWindow) {
+        NSApp.activate()
+        window.makeKeyAndOrderFront(nil)
+        window.orderFrontRegardless()
     }
 
     func removeResponseWindow(_ window: ResponseWindow) {
-        performOnMainThread { [weak self] in
-            guard let self = self else { return }
-            self.responseWindows.remove(window)
-        }
+        responseWindows.remove(window)
     }
 
     // MARK: - Popup Window
 
     func registerPopupWindow(_ window: PopupWindow) {
-        performOnMainThread { [weak self] in
-            guard let self = self else { return }
-            self.popupWindow = window
-            window.delegate = self
+        popupWindow = window
+        window.delegate = self
+    }
+
+    func setPopupDismissSuppressed(
+        _ isSuppressed: Bool,
+        reason: PopupDismissSuppressionReason
+    ) {
+        if isSuppressed {
+            popupDismissSuppressionReasons.insert(reason)
+            schedulePopupDismissSuppressionFailsafe()
+        } else {
+            popupDismissSuppressionReasons.remove(reason)
+            if popupDismissSuppressionReasons.isEmpty {
+                popupDismissSuppressionResetTask?.cancel()
+                popupDismissSuppressionResetTask = nil
+            }
         }
     }
 
-    @MainActor
-    func dismissPopup() {
+    func dismissPopup(clearImages: Bool = true) {
+        clearPopupDismissSuppressionState()
         if let window = self.popupWindow {
             window.close()
             self.popupWindow = nil
         }
 
-        // Preserve previous behavior: clear selected images on popup close.
-        AppState.shared.selectedImages = []
+        if clearImages {
+            AppState.shared.selectedImages = []
+        }
     }
 
     // MARK: - Onboarding & Settings
 
-    func transitonFromOnboardingToSettings(appState: AppState) {
-        performOnMainThread { [weak self] in
-            guard let self = self else { return }
-
-            let currentOnboardingWindow =
-                self.onboardingWindow.keyEnumerator().nextObject() as? NSWindow
-
-            let settingsWindow = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 500, height: 400),
-                styleMask: [.titled, .closable],
-                backing: .buffered,
-                defer: false
-            )
-
-            settingsWindow.title = "Complete Setup"
-            settingsWindow.identifier = NSUserInterfaceItemIdentifier("SettingsWindow")
-            settingsWindow.isReleasedWhenClosed = false
-
-            let settingsView =
-                SettingsView(appState: appState, showOnlyApiSetup: true)
-            let hostingView = NSHostingView(rootView: settingsView)
-            settingsWindow.contentView = hostingView
-            settingsWindow.delegate = self
-
-            self.settingsWindow.setObject(hostingView, forKey: settingsWindow)
-
-            // ✓ Center window BEFORE display
-            settingsWindow.level = .floating
-            settingsWindow.center()
-            
-            NSApp.activate(ignoringOtherApps: true)
-            settingsWindow.makeKeyAndOrderFront(nil)
-            
-            currentOnboardingWindow?.close()
-            self.onboardingWindow.removeAllObjects()
+    func transitionFromOnboardingToSettings(appState: AppState) {
+        if let existingSettingsWindow = settingsWindow, existingSettingsWindow.isVisible {
+            onboardingWindow?.close()
+            onboardingWindow = nil
+            bringWindowToFront(existingSettingsWindow)
+            return
         }
+
+        let currentOnboardingWindow = onboardingWindow
+
+        let newSettingsWindow = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 560, height: 520),
+            styleMask: [.titled, .closable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
+
+        newSettingsWindow.title = "Complete Setup"
+        newSettingsWindow.identifier = NSUserInterfaceItemIdentifier("SettingsWindow")
+        newSettingsWindow.isReleasedWhenClosed = false
+        newSettingsWindow.minSize = NSSize(width: 520, height: 440)
+
+        let settingsView =
+            SettingsView(appState: appState, showOnlyApiSetup: true)
+        let hostingView = NSHostingView(rootView: settingsView)
+        newSettingsWindow.contentView = hostingView
+        newSettingsWindow.delegate = self
+
+        settingsWindow = newSettingsWindow
+
+        // Center window BEFORE display
+        newSettingsWindow.level = .normal
+        newSettingsWindow.center()
+        
+        currentOnboardingWindow?.close()
+        onboardingWindow = nil
+        
+        bringWindowToFront(newSettingsWindow)
     }
 
     func setOnboardingWindow(
         _ window: NSWindow,
         hostingView: NSHostingView<OnboardingView>
     ) {
-        performOnMainThread { [weak self] in
-            guard let self = self else { return }
+        onboardingWindow = window
+        window.delegate = self
+        window.level = .floating
+        window.identifier = NSUserInterfaceItemIdentifier("OnboardingWindow")
+        
+        window.center()
+    }
 
-            self.onboardingWindow.removeAllObjects()
-            self.onboardingWindow.setObject(hostingView, forKey: window)
-            window.delegate = self
-            window.level = .floating
-            window.identifier = NSUserInterfaceItemIdentifier("OnboardingWindow")
-            
-            window.center()
+    func registerSettingsWindow(
+        _ window: NSWindow,
+        hostingView: NSHostingView<SettingsView>
+    ) {
+        settingsWindow = window
+        window.delegate = self
+        window.identifier = NSUserInterfaceItemIdentifier("SettingsWindow")
+    }
+
+    func closeSettingsWindow() {
+        if let window = settingsWindow {
+            window.close()
+            settingsWindow = nil
         }
+    }
+
+    func showOnboarding(appState: AppState, title: String = "Welcome to Writing Tools") {
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 640, height: 720),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = title
+        window.isReleasedWhenClosed = false
+        window.minSize = NSSize(width: 560, height: 600)
+
+        let onboardingView = OnboardingView(appState: appState)
+        let hostingView = NSHostingView(rootView: onboardingView)
+        window.contentView = hostingView
+        window.level = .floating
+
+        setOnboardingWindow(window, hostingView: hostingView)
+        bringWindowToFront(window)
     }
 
     // MARK: - Window Delegate
 
     func windowDidBecomeKey(_ notification: Notification) {
         guard let window = notification.object as? NSWindow else { return }
-        if !(window is PopupWindow) {
-            performOnMainThread {
-                window.level = .floating
-            }
+        let isOnboardingWindow = (window === onboardingWindow)
+        let preferredLevel: NSWindow.Level
+        if window is PopupWindow {
+            preferredLevel = .popUpMenu
+        } else if isOnboardingWindow {
+            preferredLevel = .floating
+        } else {
+            preferredLevel = .normal
+        }
+        if window.level != preferredLevel {
+            window.level = preferredLevel
+        }
+    }
+
+    func windowDidResignKey(_ notification: Notification) {
+        guard let window = notification.object as? PopupWindow else { return }
+        // Auto-dismiss popup when it loses focus (e.g., user clicks elsewhere).
+        // Skip if a sheet is attached OR if dismissal is temporarily suppressed
+        // (e.g., a sheet is about to present but hasn't attached yet).
+        if window.attachedSheet == nil && !isPopupDismissSuppressed {
+            dismissPopup()
         }
     }
 
     func windowWillClose(_ notification: Notification) {
         guard let window = notification.object as? NSWindow else { return }
 
-        performOnMainThread { [weak self] in
-            guard let self = self else { return }
-
-            if let popup = window as? PopupWindow {
-                popup.cleanup()
-                if self.popupWindow === popup {
-                    self.popupWindow = nil
-                }
-            } else if let responseWindow = window as? ResponseWindow {
-                self.removeResponseWindow(responseWindow)
-            } else if self.onboardingWindow.object(forKey: window) != nil {
-                self.onboardingWindow.removeObject(forKey: window)
-            } else if self.settingsWindow.object(forKey: window) != nil {
-                self.settingsWindow.removeObject(forKey: window)
+        if let popup = window as? PopupWindow {
+            popup.cleanup()
+            clearPopupDismissSuppressionState()
+            if popupWindow === popup {
+                popupWindow = nil
             }
-
-            window.delegate = nil
+        } else if let responseWindow = window as? ResponseWindow {
+            removeResponseWindow(responseWindow)
+        } else if window === onboardingWindow {
+            onboardingWindow = nil
+        } else if window === settingsWindow {
+            settingsWindow = nil
         }
+
+        window.delegate = nil
     }
 
     // MARK: - Cleanup
 
     func cleanupWindows() {
-        performOnWindowQueue { [weak self] in
-            guard let self = self else { return }
+        let windowsToClose = getAllWindows()
 
-            let windowsToClose = self.getAllWindows()
-
-            self.performOnMainThread {
-                windowsToClose.forEach { window in
-                    // Set delegate to nil to prevent callbacks during close
-                    window.delegate = nil
-                    window.close()
-                }
-                self.clearAllWindows()
-            }
+        windowsToClose.forEach { window in
+            // Set delegate to nil to prevent callbacks during close
+            window.delegate = nil
+            window.close()
         }
+        clearAllWindows()
     }
 
     private func getAllWindows() -> [NSWindow] {
         var windows: [NSWindow] = []
 
-        if let onboardingWindow =
-            onboardingWindow.keyEnumerator().nextObject() as? NSWindow {
+        if let onboardingWindow {
             windows.append(onboardingWindow)
         }
 
-        if let settingsWindow =
-            settingsWindow.keyEnumerator().nextObject() as? NSWindow {
+        if let settingsWindow {
             windows.append(settingsWindow)
         }
 
@@ -213,17 +263,34 @@ class WindowManager: NSObject, NSWindowDelegate {
     }
 
     private func clearAllWindows() {
-        performOnMainThread { [weak self] in
-            guard let self = self else { return }
-            self.onboardingWindow.removeAllObjects()
-            self.settingsWindow.removeAllObjects()
-            self.responseWindows.removeAllObjects()
-            self.popupWindow = nil
+        onboardingWindow = nil
+        settingsWindow = nil
+        responseWindows.removeAllObjects()
+        clearPopupDismissSuppressionState()
+        popupWindow = nil
+    }
+
+    deinit {}
+}
+
+extension WindowManager {
+    private func schedulePopupDismissSuppressionFailsafe() {
+        popupDismissSuppressionResetTask?.cancel()
+        popupDismissSuppressionResetTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            try? await Task.sleep(for: popupDismissSuppressionFailsafeDelay)
+            guard !Task.isCancelled else { return }
+            guard !popupDismissSuppressionReasons.isEmpty else { return }
+            logger.warning("Resetting popup dismissal suppression via failsafe")
+            popupDismissSuppressionReasons.removeAll()
+            popupDismissSuppressionResetTask = nil
         }
     }
 
-    deinit {
-        cleanupTimer?.invalidate()
+    private func clearPopupDismissSuppressionState() {
+        popupDismissSuppressionResetTask?.cancel()
+        popupDismissSuppressionResetTask = nil
+        popupDismissSuppressionReasons.removeAll()
     }
 }
 
