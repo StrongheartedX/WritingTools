@@ -25,14 +25,12 @@ class MigrationHelper {
             return
         }
         
-        let commandsBefore = commandManager.commands.count
-        
         // Migrate custom commands
         commandManager.migrateFromLegacySystems(customCommands: customCommandsManager.commands)
         
         // Only mark migration as complete if commands were loaded successfully
         // (the manager should have at least the built-in commands after migration)
-        if !commandManager.commands.isEmpty || commandsBefore == 0 {
+        if !commandManager.commands.isEmpty {
             UserDefaults.standard.set(true, forKey: migrationCompletedKey)
         }
     }

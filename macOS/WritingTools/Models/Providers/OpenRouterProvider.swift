@@ -35,7 +35,7 @@ final class OpenRouterProvider: AIProvider {
     var isProcessing = false
     
     private var config: OpenRouterConfig
-    private var activeTask: Task<Void, Never>?
+    private var activeTask: Task<Void, any Error>?
     
     init(config: OpenRouterConfig) {
         self.config = config
@@ -129,6 +129,7 @@ final class OpenRouterProvider: AIProvider {
         isProcessing = true
         defer {
             isProcessing = false
+            activeTask = nil
         }
 
         guard !config.apiKey.isEmpty else {
@@ -164,7 +165,8 @@ final class OpenRouterProvider: AIProvider {
             route: .fallback
         )
 
-        do {
+        // Wrap work in a stored task so cancel() can interrupt it
+        let streamTask = Task { @MainActor in
             let stream = try await openRouterService.streamingChatCompletionRequest(body: requestBody)
             for try await chunk in stream {
                 try Task.checkCancellation()
@@ -172,6 +174,11 @@ final class OpenRouterProvider: AIProvider {
                     onChunk(content)
                 }
             }
+        }
+        activeTask = streamTask
+
+        do {
+            try await streamTask.value
         } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
             logger.error("OpenRouter streaming error (\(statusCode)): \(responseBody)")
             throw NSError(domain: "OpenRouterAPI", code: statusCode,

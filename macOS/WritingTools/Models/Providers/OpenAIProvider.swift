@@ -32,7 +32,7 @@ enum OpenAIModel: String, CaseIterable {
 final class OpenAIProvider: AIProvider {
     var isProcessing = false
     private var config: OpenAIConfig
-    private var activeTask: Task<Void, Never>?
+    private var activeTask: Task<Void, any Error>?
     
     init(config: OpenAIConfig) {
         self.config = config
@@ -315,6 +315,7 @@ final class OpenAIProvider: AIProvider {
         isProcessing = true
         defer {
             isProcessing = false
+            activeTask = nil
         }
         
         guard !config.apiKey.isEmpty else {
@@ -323,13 +324,18 @@ final class OpenAIProvider: AIProvider {
         
         // For custom base URLs, use manual SSE streaming
         if !config.baseURL.isEmpty && config.baseURL != OpenAIConfig.defaultBaseURL {
-            try await Self.performCustomOpenAIStreamingRequest(
-                config: config,
-                systemPrompt: systemPrompt,
-                userPrompt: userPrompt,
-                images: images,
-                onChunk: onChunk
-            )
+            let config = self.config
+            let streamTask = Task { @MainActor in
+                try await Self.performCustomOpenAIStreamingRequest(
+                    config: config,
+                    systemPrompt: systemPrompt,
+                    userPrompt: userPrompt,
+                    images: images,
+                    onChunk: onChunk
+                )
+            }
+            activeTask = streamTask
+            try await streamTask.value
             return
         }
         
@@ -362,7 +368,8 @@ final class OpenAIProvider: AIProvider {
             messages.append(.user(content: .parts(parts)))
         }
         
-        do {
+        // Wrap work in a stored task so cancel() can interrupt it
+        let streamTask = Task { @MainActor in
             let stream = try await openAIService.streamingChatCompletionRequest(body: .init(
                 model: config.model,
                 messages: messages
@@ -374,6 +381,11 @@ final class OpenAIProvider: AIProvider {
                     onChunk(content)
                 }
             }
+        }
+        activeTask = streamTask
+        
+        do {
+            try await streamTask.value
         } catch AIProxyError.unsuccessfulRequest(let statusCode, let responseBody) {
             logger.error("Received non-200 status code: \(statusCode) with response body: \(responseBody)")
             throw NSError(domain: "OpenAIAPI",
